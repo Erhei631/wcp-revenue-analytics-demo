@@ -80,7 +80,8 @@ const REP_DEFS = [
 
 type RepKey = (typeof REP_DEFS)[number]['key'];
 
-export type SalesFilter = 'all' | RepKey;
+/** Empty array means all sales reps are included. */
+export type SalesFilter = RepKey[];
 
 const CLIENTS = [
   { id: 'acme', name: 'Acme Corp · ERP rollout' },
@@ -91,7 +92,8 @@ const CLIENTS = [
 
 type ClientId = (typeof CLIENTS)[number]['id'];
 
-export type ClientFilter = 'all' | ClientId;
+/** Empty array means all clients & projects are included. */
+export type ClientFilter = ClientId[];
 
 const CLIENT_IDS: ClientId[] = CLIENTS.map((c) => c.id);
 
@@ -161,26 +163,64 @@ function buildClientRepMonthlyExclusive(): Record<ClientId, Record<RepKey, numbe
 
 const CLIENT_REP_MONTHLY = buildClientRepMonthlyExclusive();
 
-function monthlyByRepForClient(clientFilter: ClientFilter): Record<RepKey, readonly number[]> {
-  if (clientFilter === 'all') return BREAKDOWN;
-  return CLIENT_REP_MONTHLY[clientFilter];
+function isAllClientsSelected(clientIds: ClientFilter) {
+  return clientIds.length === 0 || clientIds.length === CLIENT_IDS.length;
 }
 
-function clientFilterNote(clientFilter: ClientFilter): string | undefined {
-  if (clientFilter === 'all') return undefined;
-  const row = CLIENTS.find((c) => c.id === clientFilter);
-  const owner = REP_DEFS.find((r) => r.key === CLIENT_OWNER[clientFilter])?.name;
-  const label = row?.name ?? clientFilter;
-  return `Client / project: ${label} · owner: ${owner ?? '—'} (demo)`;
+function isAllSalesSelected(salesKeys: SalesFilter) {
+  return salesKeys.length === 0 || salesKeys.length === REP_KEYS.length;
+}
+
+function monthlyByRepForClients(clientIds: ClientFilter): Record<RepKey, number[]> {
+  if (isAllClientsSelected(clientIds)) {
+    return Object.fromEntries(REP_KEYS.map((k) => [k, [...BREAKDOWN[k]]])) as Record<RepKey, number[]>;
+  }
+
+  const merged = Object.fromEntries(
+    REP_KEYS.map((k) => [k, PERIODS.map(() => 0)]),
+  ) as Record<RepKey, number[]>;
+
+  for (const id of clientIds) {
+    const slice = CLIENT_REP_MONTHLY[id];
+    for (const k of REP_KEYS) {
+      for (let i = 0; i < PERIODS.length; i++) {
+        merged[k][i] += slice[k][i];
+      }
+    }
+  }
+
+  return merged;
+}
+
+function clientFilterNote(clientIds: ClientFilter): string | undefined {
+  if (isAllClientsSelected(clientIds)) return undefined;
+  const labels = clientIds.map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id);
+  return `Client / project: ${labels.join(', ')} (demo)`;
+}
+
+function formatClientScopeLabel(clientIds: ClientFilter): string | null {
+  if (isAllClientsSelected(clientIds)) return null;
+  const names = clientIds.map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id);
+  if (names.length <= 2) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
+}
+
+function formatSalesFilterLabel(salesKeys: SalesFilter): string {
+  if (isAllSalesSelected(salesKeys)) return 'All Sales';
+  const names = salesKeys.map((key) => REP_DEFS.find((r) => r.key === key)?.name ?? key);
+  return names.join(', ');
+}
+
+function sumRepsSeries(byRep: Record<RepKey, number[]>, keys: RepKey[]): number[] {
+  const length = byRep[REP_KEYS[0]]?.length ?? 0;
+  return Array.from({ length }, (_, i) => keys.reduce((sum, key) => sum + (byRep[key][i] ?? 0), 0));
 }
 
 /** Build analytics view from demo monthly rows, filtered to the selected month range. */
-function buildResolvedView(range: MonthRangeValue, clientFilter: ClientFilter, rangeLabel: string): BuiltView {
-  const monthly = Object.fromEntries(
-    REP_KEYS.map((k) => [k, [...monthlyByRepForClient(clientFilter)[k]]]),
-  ) as Record<RepKey, number[]>;
+function buildResolvedView(range: MonthRangeValue, clientIds: ClientFilter, rangeLabel: string): BuiltView {
+  const monthly = monthlyByRepForClients(clientIds);
   const m = monthlySystemFromRep(monthly);
-  const baseNote = clientFilterNote(clientFilter);
+  const baseNote = clientFilterNote(clientIds);
   const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
     .filter(({ month }) => monthInRange(month, range))
     .map(({ i }) => i);
@@ -361,23 +401,34 @@ function splitAmountByProjects(
   });
 }
 
-function breakdownForCell(repKey: RepKey, amount: number, clientFilter: ClientFilter): ProjectRevenueLine[] {
+function breakdownForCell(repKey: RepKey, amount: number, clientIds: ClientFilter): ProjectRevenueLine[] {
   if (amount === 0) return [];
-  if (clientFilter !== 'all') {
-    const client = CLIENTS.find((c) => c.id === clientFilter);
-    return [{ project: client?.name ?? clientFilter, revenue: amount }];
+  if (isAllClientsSelected(clientIds)) {
+    return splitAmountByProjects(amount, REP_PROJECT_SPLITS[repKey]);
   }
-  return splitAmountByProjects(amount, REP_PROJECT_SPLITS[repKey]);
+
+  const owned = clientIds.filter((id) => CLIENT_OWNER[id] === repKey);
+  if (owned.length === 0) return [];
+  if (owned.length === 1) {
+    const client = CLIENTS.find((c) => c.id === owned[0]);
+    return [{ project: client?.name ?? owned[0], revenue: amount }];
+  }
+
+  const projects = owned.map((id) => ({
+    name: CLIENTS.find((c) => c.id === id)?.name ?? id,
+    weight: CLIENT_TAKE_OF_OWNER[id],
+  }));
+  return splitAmountByProjects(amount, projects);
 }
 
 function breakdownForRowTotal(
   repKey: RepKey,
   values: number[],
-  clientFilter: ClientFilter,
+  clientIds: ClientFilter,
 ): ProjectRevenueLine[] {
   const totals = new Map<string, number>();
   values.forEach((amount) => {
-    breakdownForCell(repKey, amount, clientFilter).forEach(({ project, revenue }) => {
+    breakdownForCell(repKey, amount, clientIds).forEach(({ project, revenue }) => {
       totals.set(project, (totals.get(project) ?? 0) + revenue);
     });
   });
@@ -427,9 +478,9 @@ function maxChartValue(system: number[], byRep: Record<RepKey, number[]>) {
   return max;
 }
 
-function repsVisibleForClient(byRep: Record<RepKey, number[]>, clientFilter: ClientFilter) {
+function repsVisibleForClients(byRep: Record<RepKey, number[]>, clientIds: ClientFilter) {
   return REP_DEFS.filter((r) => {
-    if (clientFilter === 'all') return true;
+    if (isAllClientsSelected(clientIds)) return true;
     return byRep[r.key].reduce((a, b) => a + b, 0) > 0;
   });
 }
@@ -567,14 +618,14 @@ function TotalRevenueTrendTooltip({
   label,
   periods,
   byRep,
-  clientFilter,
+  clientIds,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ value?: unknown }>;
   label?: string | number;
   periods: string[];
   byRep: Record<RepKey, number[]>;
-  clientFilter: ClientFilter;
+  clientIds: ClientFilter;
 }) {
   if (!active || !payload?.length) return null;
 
@@ -582,7 +633,7 @@ function TotalRevenueTrendTooltip({
   if (idx < 0) return null;
 
   const total = Number(payload[0]?.value ?? 0);
-  const visibleReps = repsVisibleForClient(byRep, clientFilter);
+  const visibleReps = repsVisibleForClients(byRep, clientIds);
 
   return (
     <div style={chartTooltipShellStyle}>
@@ -621,21 +672,26 @@ type Row = RevenueBreakdownRow;
 export default function SalesRevenueAnalyticsPage() {
   const [monthRange, setMonthRange] = useState<MonthRangeValue>(() => resolveMonthPreset('ytd', REPORTING_END));
   const [activePreset, setActivePreset] = useState<QuickPresetKey | null>('ytd');
-  const [salesFilter, setSalesFilter] = useState<SalesFilter>('all');
-  const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
+  const [selectedSalesKeys, setSelectedSalesKeys] = useState<SalesFilter>([]);
+  const [selectedClientIds, setSelectedClientIds] = useState<ClientFilter>([]);
 
   const rangeLabel = activePreset ? PRESET_LABELS[activePreset] : formatMonthRangeLabel(monthRange);
 
   const view = useMemo(
-    () => buildResolvedView(monthRange, clientFilter, rangeLabel),
-    [clientFilter, monthRange, rangeLabel],
+    () => buildResolvedView(monthRange, selectedClientIds, rangeLabel),
+    [monthRange, rangeLabel, selectedClientIds],
   );
 
-  const isAllReps = salesFilter === 'all';
+  const isAllReps = isAllSalesSelected(selectedSalesKeys);
+  const isSingleRep = selectedSalesKeys.length === 1;
+  const activeSalesKeys = useMemo(
+    () => (isAllReps ? REP_KEYS : selectedSalesKeys),
+    [isAllReps, selectedSalesKeys],
+  );
 
   const primarySeries = useMemo(
-    () => (isAllReps ? view.system : view.byRep[salesFilter]),
-    [isAllReps, salesFilter, view.byRep, view.system],
+    () => (isAllReps ? view.system : sumRepsSeries(view.byRep, activeSalesKeys)),
+    [activeSalesKeys, isAllReps, view.byRep, view.system],
   );
 
   const totalTrendData = useMemo(
@@ -666,10 +722,10 @@ export default function SalesRevenueAnalyticsPage() {
   );
 
   const filteredTableRows = useMemo(() => {
-    const bySales = isAllReps ? tableRows : tableRows.filter((r) => r.key === salesFilter);
-    if (clientFilter === 'all') return bySales;
+    const bySales = isAllReps ? tableRows : tableRows.filter((r) => activeSalesKeys.includes(r.key));
+    if (isAllClientsSelected(selectedClientIds)) return bySales;
     return bySales.filter((r) => r.total > 0);
-  }, [clientFilter, isAllReps, salesFilter, tableRows]);
+  }, [activeSalesKeys, isAllReps, selectedClientIds, tableRows]);
 
   const columns: TableColumnsType<Row> = useMemo(
     () => [
@@ -700,7 +756,7 @@ export default function SalesRevenueAnalyticsPage() {
         render: (_: unknown, record: Row) => (
           <RevenueAmountTooltipCell
             amount={record.values[idx]}
-            lines={breakdownForCell(record.key, record.values[idx], clientFilter)}
+            lines={breakdownForCell(record.key, record.values[idx], selectedClientIds)}
           />
         ),
       })),
@@ -712,13 +768,13 @@ export default function SalesRevenueAnalyticsPage() {
         render: (_: unknown, record: Row) => (
           <RevenueAmountTooltipCell
             amount={record.total}
-            lines={breakdownForRowTotal(record.key, record.values, clientFilter)}
+            lines={breakdownForRowTotal(record.key, record.values, selectedClientIds)}
             strong
           />
         ),
       },
     ],
-    [clientFilter, view.periods],
+    [selectedClientIds, view.periods],
   );
 
   const totalChartMax = useMemo(() => {
@@ -741,44 +797,44 @@ export default function SalesRevenueAnalyticsPage() {
   const latestLabel = view.periods[view.periods.length - 1] ?? '—';
 
   const topRep = useMemo(() => {
-    if (tableRows.length === 0) return { name: '—', value: 0 };
-    const best = tableRows.reduce((a, b) => (b.total > a.total ? b : a));
+    const candidates = isAllReps
+      ? tableRows
+      : tableRows.filter((r) => activeSalesKeys.includes(r.key));
+    if (candidates.length === 0) return { name: '—', value: 0 };
+    const best = candidates.reduce((a, b) => (b.total > a.total ? b : a));
     return { name: best.name, value: best.total };
-  }, [tableRows]);
+  }, [activeSalesKeys, isAllReps, tableRows]);
 
   const selectedRepMeta = useMemo(
-    () => (isAllReps ? null : REP_DEFS.find((r) => r.key === salesFilter) ?? null),
-    [isAllReps, salesFilter],
+    () => (isSingleRep ? REP_DEFS.find((r) => r.key === selectedSalesKeys[0]) ?? null : null),
+    [isSingleRep, selectedSalesKeys],
   );
 
   const clientScopeLabel = useMemo(
-    () => (clientFilter === 'all' ? null : CLIENTS.find((c) => c.id === clientFilter)?.name ?? null),
-    [clientFilter],
+    () => formatClientScopeLabel(selectedClientIds),
+    [selectedClientIds],
   );
 
   const trendColor = THEME_PRIMARY;
 
   const shareOfTeam =
-    !isAllReps && viewTotal > 0 ? Math.round((primaryTotal / viewTotal) * 1000) / 10 : null;
+    isSingleRep && viewTotal > 0 ? Math.round((primaryTotal / viewTotal) * 1000) / 10 : null;
 
   const salesSelectOptions = useMemo(
-    () => [
-      { value: 'all' as const, label: 'All Sales' },
-      ...REP_DEFS.map((r) => ({ value: r.key, label: r.name })),
-    ],
+    () => REP_DEFS.map((r) => ({ value: r.key, label: r.name })),
     [],
   );
 
   const clientSelectOptions = useMemo(
-    () => [
-      { value: 'all' as const, label: 'All Client & Projects' },
-      ...CLIENTS.map((c) => {
+    () =>
+      CLIENTS.map((c) => {
         const owner = REP_DEFS.find((r) => r.key === CLIENT_OWNER[c.id])?.name;
         return { value: c.id, label: `${c.name} — ${owner ?? ''}` };
       }),
-    ],
     [],
   );
+
+  const chartFillKey = isAllReps ? 'all' : activeSalesKeys.join('-');
 
   const pillSuffix = (
     <CaretDownFilled style={{ fontSize: 9, color: '#262626', display: 'block' }} />
@@ -810,26 +866,24 @@ export default function SalesRevenueAnalyticsPage() {
       },
       {
         key: 'top-or-share',
-        title: isAllReps ? 'Top Sales Rep' : 'Share of team',
-        value: isAllReps ? personDisplayName(topRep.name) : `${shareOfTeam ?? 0}%`,
-        valueTitle: isAllReps && topRep.name !== '—' ? topRep.name : undefined,
-        valueVariant: isAllReps ? 'person' : 'metric',
-        rightLabel: isAllReps ? money(topRep.value) : money(viewTotal),
-        rightLabelTone: !isAllReps ? 'positive' : 'default',
+        title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
+        value: isSingleRep ? `${shareOfTeam ?? 0}%` : personDisplayName(topRep.name),
+        valueTitle: !isSingleRep && topRep.name !== '—' ? topRep.name : undefined,
+        valueVariant: isSingleRep ? 'metric' : 'person',
+        rightLabel: isSingleRep ? money(viewTotal) : money(topRep.value),
+        rightLabelTone: isSingleRep ? 'positive' : 'default',
       },
     ],
-    [avgPerPeriod, isAllReps, latestLabel, latestValue, periodCount, primaryTotal, shareOfTeam, topRep, viewTotal],
+    [avgPerPeriod, isSingleRep, latestLabel, latestValue, periodCount, primaryTotal, shareOfTeam, topRep, viewTotal],
   );
 
   const handleExportAnalytics = useCallback(() => {
-    const salesLabel =
-      salesFilter === 'all'
-        ? 'All Sales'
-        : (REP_DEFS.find((r) => r.key === salesFilter)?.name ?? salesFilter);
-    const clientLabel =
-      clientFilter === 'all'
-        ? 'All Client & Projects'
-        : (CLIENTS.find((c) => c.id === clientFilter)?.name ?? clientFilter);
+    const salesLabel = formatSalesFilterLabel(selectedSalesKeys);
+    const clientLabel = isAllClientsSelected(selectedClientIds)
+      ? 'All Client & Projects'
+      : selectedClientIds
+          .map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id)
+          .join(', ');
 
     const rows = buildAnalyticsExportRows({
       exportedAt: dayjs().format('YYYY-MM-DD HH:mm'),
@@ -852,13 +906,13 @@ export default function SalesRevenueAnalyticsPage() {
     downloadCsvFile(filename, rows);
     message.success(`Exported ${filename}`);
   }, [
-    clientFilter,
     filteredTableRows,
     isAllReps,
     monthRange,
     multiLineData,
     rangeLabel,
-    salesFilter,
+    selectedClientIds,
+    selectedSalesKeys,
     statItems,
     totalTrendData,
     view.note,
@@ -929,19 +983,29 @@ export default function SalesRevenueAnalyticsPage() {
                 setActivePreset(preset ?? null);
               }}
             />
-            <Select<ClientFilter>
+            <Select
+              mode="multiple"
+              allowClear
               className="analytics-toolbar-select"
-              value={clientFilter}
-              onChange={(v) => setClientFilter(v)}
+              value={selectedClientIds}
+              onChange={(values) => setSelectedClientIds(values as ClientFilter)}
               options={clientSelectOptions}
+              placeholder="All Client & Projects"
+              maxTagCount={1}
+              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
               suffixIcon={pillSuffix}
               popupMatchSelectWidth={false}
             />
-            <Select<SalesFilter>
+            <Select
+              mode="multiple"
+              allowClear
               className="analytics-toolbar-select"
-              value={salesFilter}
-              onChange={(v) => setSalesFilter(v)}
+              value={selectedSalesKeys}
+              onChange={(values) => setSelectedSalesKeys(values as SalesFilter)}
               options={salesSelectOptions}
+              placeholder="All Sales"
+              maxTagCount={1}
+              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
               suffixIcon={pillSuffix}
               popupMatchSelectWidth={false}
             />
@@ -966,14 +1030,14 @@ export default function SalesRevenueAnalyticsPage() {
             ) : null
           ) : (
             <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {`${selectedRepMeta?.name}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} · revenue ($) in this view — team total in same view: ${money(viewTotal)}`}
+              {`${isSingleRep ? selectedRepMeta?.name : formatSalesFilterLabel(selectedSalesKeys)}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} · revenue ($) in this view — team total in same view: ${money(viewTotal)}`}
             </Text>
           )}
           <div style={{ width: '100%', height: 320 }}>
             <ResponsiveContainer>
               <AreaChart data={totalTrendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id={`revFill-${salesFilter}`} x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id={`revFill-${chartFillKey}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={trendColor} stopOpacity={0.35} />
                     <stop offset="100%" stopColor={trendColor} stopOpacity={0} />
                   </linearGradient>
@@ -995,7 +1059,7 @@ export default function SalesRevenueAnalyticsPage() {
                       label={label}
                       periods={view.periods}
                       byRep={view.byRep}
-                      clientFilter={clientFilter}
+                      clientIds={selectedClientIds}
                     />
                   )}
                 />
@@ -1004,7 +1068,7 @@ export default function SalesRevenueAnalyticsPage() {
                   dataKey="revenue"
                   stroke={trendColor}
                   strokeWidth={2}
-                  fill={`url(#revFill-${salesFilter})`}
+                  fill={`url(#revFill-${chartFillKey})`}
                   dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: trendColor }}
                   activeDot={{ r: 5 }}
                 />
@@ -1029,7 +1093,7 @@ export default function SalesRevenueAnalyticsPage() {
             ) : null
           ) : (
             <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {`Showing ${selectedRepMeta?.name}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} only — choose “All sales” to compare everyone`}
+              {`Showing ${isSingleRep ? selectedRepMeta?.name : formatSalesFilterLabel(selectedSalesKeys)}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} only — clear selection to compare everyone`}
             </Text>
           )}
           <div style={{ width: '100%', height: 340 }}>
@@ -1051,9 +1115,9 @@ export default function SalesRevenueAnalyticsPage() {
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {REP_DEFS.map((r) => {
-                  if (!isAllReps && r.key !== salesFilter) return null;
+                  if (!activeSalesKeys.includes(r.key)) return null;
                   const repTotal = view.byRep[r.key].reduce((a, b) => a + b, 0);
-                  if (clientFilter !== 'all' && repTotal === 0) return null;
+                  if (!isAllClientsSelected(selectedClientIds) && repTotal === 0) return null;
                   const dataKey = r.key;
                   return (
                     <Line
