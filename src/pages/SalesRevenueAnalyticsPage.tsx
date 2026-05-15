@@ -1082,7 +1082,7 @@ export default function SalesRevenueAnalyticsPage() {
           style={{ borderRadius: 8, marginBottom: 16, borderColor: '#f0f0f0' }}
           styles={{ body: { padding: '18px 18px 8px' } }}
         >
-          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
             Individual Sales Trend
           </Title>
           {isAllReps ? (

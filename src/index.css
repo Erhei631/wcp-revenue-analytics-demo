@@ -291,6 +291,10 @@ svg {
   background: #dfe5ee !important;
 }
 
+.analytics-revenue-table .ant-table-cell {
+  padding-left: 12px;
+}
+
 .revenue-breakdown-tooltip .ant-tooltip-inner {
   background: transparent !important;
   box-shadow: none !important;
