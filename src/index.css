@@ -234,6 +234,11 @@ svg {
   font-size: 24px;
   line-height: 1.1;
   letter-spacing: -0.2px;
+  cursor: default;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 992px) {

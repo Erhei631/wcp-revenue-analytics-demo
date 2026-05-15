@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
+import { Tooltip } from 'antd';
 
 export type AnalyticsStatItem = {
   key: string;
   title: string;
   value: ReactNode;
+  /** Full label shown on hover when the visible value is abbreviated (e.g. person name). */
+  valueTitle?: string;
   valueVariant?: 'metric' | 'person';
   unit?: string;
   note?: ReactNode;
@@ -25,15 +28,26 @@ export function AnalyticsStatBar({ items }: AnalyticsStatBarProps) {
           <div className="analytics-stat-bar__note">{item.note ?? ''}</div>
           <div className="analytics-stat-bar__content">
             <div className="analytics-stat-bar__value-wrap">
-              <span
-                className={
-                  item.valueVariant === 'person'
-                    ? 'analytics-stat-bar__value analytics-stat-bar__value--person'
-                    : 'analytics-stat-bar__value'
-                }
-              >
-                {item.value}
-              </span>
+              {item.valueVariant === 'person' && item.valueTitle ? (
+                <Tooltip title={item.valueTitle}>
+                  <span
+                    className="analytics-stat-bar__value analytics-stat-bar__value--person"
+                    tabIndex={0}
+                  >
+                    {item.value}
+                  </span>
+                </Tooltip>
+              ) : (
+                <span
+                  className={
+                    item.valueVariant === 'person'
+                      ? 'analytics-stat-bar__value analytics-stat-bar__value--person'
+                      : 'analytics-stat-bar__value'
+                  }
+                >
+                  {item.value}
+                </span>
+              )}
               {item.unit ? <span className="analytics-stat-bar__unit">{item.unit}</span> : null}
             </div>
             {item.rightLabel ? (
