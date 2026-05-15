@@ -1,0 +1,435 @@
+:root {
+  --theme-primary: #469bff;
+  --theme-primary-soft: rgba(70, 155, 255, 0.18);
+  --theme-primary-muted: rgba(70, 155, 255, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f5f5;
+}
+
+svg {
+  background: unset;
+  background-color: unset;
+}
+
+.recharts-surface {
+  background-color: #fff;
+}
+
+.billing-row-client > td {
+  background: #f7fafc !important;
+  vertical-align: top;
+}
+
+.billing-row-project > td {
+  vertical-align: middle;
+}
+
+.my-work-menu-icon,
+.project-tracking-menu-icon,
+.company-menu-icon,
+.management-menu-icon {
+  display: block;
+  object-fit: contain;
+}
+
+/* Sidebar: 8px between menu icon and title (Ant icons + custom img icons) */
+.dashboard-sider-menu .ant-menu-item-icon,
+.dashboard-sider-menu .my-work-menu-icon,
+.dashboard-sider-menu .project-tracking-menu-icon,
+.dashboard-sider-menu .company-menu-icon,
+.dashboard-sider-menu .management-menu-icon {
+  margin-inline-end: 8px !important;
+  flex-shrink: 0;
+}
+
+/* Toolbar pill selects — 180×36, soft shadow */
+.analytics-toolbar-select.ant-select {
+  --analytics-select-height: 36px;
+  --analytics-select-width: 180px;
+  --analytics-select-arrow-size: 9px;
+  width: var(--analytics-select-width) !important;
+  min-width: var(--analytics-select-width) !important;
+  max-width: var(--analytics-select-width) !important;
+  height: var(--analytics-select-height) !important;
+  flex: none !important;
+}
+
+.analytics-toolbar-select.ant-select .ant-select-selector {
+  border-radius: 9999px !important;
+  border: 1px solid #f0f0f0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  background: #fff !important;
+  padding-inline: 16px 32px !important;
+  min-height: var(--analytics-select-height) !important;
+  height: var(--analytics-select-height) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.analytics-toolbar-select.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+  border-color: #ececec !important;
+}
+
+.analytics-toolbar-select.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+  border-color: #e0e0e0 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07) !important;
+}
+
+.analytics-toolbar-select .ant-select-selection-wrap,
+.analytics-toolbar-select .ant-select-selection-search {
+  align-self: center !important;
+}
+
+.analytics-toolbar-select .ant-select-selection-wrap::after {
+  line-height: 22px !important;
+}
+
+.analytics-toolbar-select .ant-select-selection-item,
+.analytics-toolbar-select .ant-select-selection-placeholder {
+  color: #999 !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  align-self: center !important;
+}
+
+/* Arrow: fill select height + flex-center (do NOT use inset-block:auto — it resets top:50%) */
+.analytics-toolbar-select.ant-select {
+  position: relative;
+}
+
+.analytics-toolbar-select.ant-select .ant-select-arrow {
+  top: 0 !important;
+  bottom: 0 !important;
+  height: 100% !important;
+  margin-top: 0 !important;
+  transform: none !important;
+  inset-inline-end: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 0 !important;
+  pointer-events: none !important;
+}
+
+.analytics-toolbar-select.ant-select .ant-select-arrow .anticon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 0 !important;
+  vertical-align: middle !important;
+  font-size: var(--analytics-select-arrow-size) !important;
+}
+
+.analytics-toolbar-select.ant-select .ant-select-arrow .anticon > svg {
+  display: block !important;
+  vertical-align: middle !important;
+}
+
+/* Override Ant Design default vertical-align: top on suffix icons */
+.analytics-toolbar-select.ant-select .ant-select-arrow .anticon.anticon-caret-down {
+  vertical-align: middle !important;
+}
+
+/* Sales analytics KPI bar */
+.analytics-stat-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.analytics-stat-bar__section {
+  position: relative;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-stat-bar__divider {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: #f0f0f0;
+}
+
+.analytics-stat-bar__title {
+  color: #595959;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+
+.analytics-stat-bar__note {
+  color: #f5a623;
+  font-size: 10px;
+  line-height: 1.2;
+  min-height: 12px;
+  margin-bottom: 4px;
+}
+
+.analytics-stat-bar__content {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.analytics-stat-bar__value-wrap {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.analytics-stat-bar__value {
+  color: var(--theme-primary, #469bff);
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.analytics-stat-bar__unit {
+  color: #1f1f1f;
+  font-size: 13px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.analytics-stat-bar__right-label {
+  color: #8c8c8c;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.analytics-stat-bar__right-label--positive {
+  color: #40c585;
+}
+
+.analytics-stat-bar__value--person {
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: -0.2px;
+}
+
+@media (max-width: 992px) {
+  .analytics-stat-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .analytics-stat-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-stat-bar__divider {
+    top: 0;
+    bottom: auto;
+    left: 14px;
+    right: 14px;
+    width: auto;
+    height: 1px;
+  }
+}
+
+/* Sales revenue analytics — revenue breakdown table */
+.analytics-revenue-table .ant-table-thead > tr > th {
+  background: #dfe5ee !important;
+}
+
+.revenue-breakdown-tooltip .ant-tooltip-inner {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  color: inherit !important;
+}
+
+.revenue-breakdown-tooltip .ant-tooltip-arrow::before {
+  background: #fff !important;
+}
+
+/* Billing dashboard — Revenue Analytics toolbar button */
+.billing-revenue-analytics-btn.ant-btn-default {
+  color: var(--theme-primary, #469bff);
+  border-color: var(--theme-primary, #469bff);
+}
+
+.billing-revenue-analytics-btn.ant-btn-default .anticon {
+  color: var(--theme-primary, #469bff);
+}
+
+.billing-revenue-analytics-btn.ant-btn-default:not(:disabled):hover,
+.billing-revenue-analytics-btn.ant-btn-default:not(:disabled):focus-visible {
+  color: var(--theme-primary, #469bff);
+  border-color: var(--theme-primary, #469bff);
+  background: var(--theme-primary-muted, rgba(70, 155, 255, 0.12));
+}
+
+.billing-revenue-analytics-btn.ant-btn-default:not(:disabled):hover .anticon,
+.billing-revenue-analytics-btn.ant-btn-default:not(:disabled):focus-visible .anticon {
+  color: var(--theme-primary, #469bff);
+}
+
+/* Billing dashboard — unified card with filter + table */
+.billing-board-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.billing-board-card__toolbar {
+  padding: 16px 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.billing-board-card__table .ant-table-wrapper {
+  border-radius: 0;
+}
+
+.billing-board-card__table .ant-table {
+  border-radius: 0;
+}
+
+/* Billing filter bar — two-row layout (reference mockup) */
+.billing-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.billing-filter-bar__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.billing-filter-bar__row--primary {
+  gap: 14px;
+}
+
+.billing-filter-bar__spacer {
+  flex: 1 1 auto;
+  min-width: 12px;
+}
+
+.billing-filter-bar__status-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.billing-filter-bar__status-icon {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.billing-filter-bar__status-link {
+  color: #1677ff !important;
+  font-size: 13px;
+}
+
+/* Date range — matches MonthRangePicker chevron nav (revenue analytics) */
+.billing-date-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.billing-date-nav__outer {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #595959;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+
+.billing-date-nav__label {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+}
+
+.billing-date-nav__text {
+  color: #1f1f1f;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 6 Mo / Year segmented toggle */
+.billing-period-toggle {
+  display: inline-flex;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.billing-period-toggle__btn {
+  border: none;
+  background: #fff;
+  color: #1f1f1f;
+  font-size: 14px;
+  line-height: 1;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.billing-period-toggle__btn + .billing-period-toggle__btn {
+  border-left: 1px solid #d9d9d9;
+}
+
+.billing-period-toggle__btn--active {
+  background: var(--theme-primary, #469bff);
+  color: #fff;
+}
+
+.billing-period-toggle__btn--active + .billing-period-toggle__btn,
+.billing-period-toggle__btn + .billing-period-toggle__btn--active {
+  border-left-color: var(--theme-primary, #469bff);
+}
+
