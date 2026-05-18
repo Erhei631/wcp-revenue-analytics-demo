@@ -247,12 +247,6 @@ function formatSalesFilterLabel(salesKeys: SalesFilter): string {
   return names.join(', ');
 }
 
-function formatClientFilterLabel(clientIds: ClientFilter): string {
-  if (isAllClientsSelected(clientIds)) return 'All Client & Projects';
-  const names = clientIds.map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id);
-  return names.join(', ');
-}
-
 function applySalesScope(
   salesKeys: SalesFilter,
   byRep: Record<RepKey, number[]>,
@@ -833,8 +827,6 @@ export default function SalesRevenueAnalyticsPage() {
 
   const isAllReps = isAllSalesSelected(selectedSalesKeys);
   const isSingleRep = selectedSalesKeys.length === 1;
-  const isAllClients = isAllClientsSelected(selectedClientIds);
-  const isSingleClient = selectedClientIds.length === 1;
   const activeSalesKeys = useMemo(
     () => (isAllReps ? REP_KEYS : selectedSalesKeys),
     [isAllReps, selectedSalesKeys],
@@ -1038,11 +1030,6 @@ export default function SalesRevenueAnalyticsPage() {
   const selectedRepMeta = useMemo(
     () => (isSingleRep ? REP_DEFS.find((r) => r.key === selectedSalesKeys[0]) ?? null : null),
     [isSingleRep, selectedSalesKeys],
-  );
-
-  const selectedClientMeta = useMemo(
-    () => (isSingleClient ? CLIENT_DEFS.find((c) => c.key === selectedClientIds[0]) ?? null : null),
-    [isSingleClient, selectedClientIds],
   );
 
   const visibleClientTrendDefs = useMemo(
