@@ -537,6 +537,12 @@ svg {
   flex-shrink: 0;
 }
 
+.account-overview-chart .recharts-default-legend {
+  display: flex !important;
+  justify-content: center;
+  gap: 12px;
+}
+
 /* Billing dashboard — Revenue Analytics toolbar button */
 .billing-revenue-analytics-btn.ant-btn-default {
   color: var(--theme-primary, #469bff);

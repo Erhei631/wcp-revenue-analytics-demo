@@ -441,7 +441,7 @@ export function ClientCollectionChartCard({
         ) : null}
       </div>
 
-      <div style={{ width: '100%', height: 360 }}>
+      <div className="account-overview-chart" style={{ width: '100%', height: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             key={`${filterScopeKey}-${activeDrillKey ?? 'clients'}`}
@@ -468,7 +468,7 @@ export function ClientCollectionChartCard({
               axisLine={{ stroke: '#e8e8e8' }}
             />
             <RTooltip content={<CollectionTooltip />} cursor={{ fill: 'rgba(70, 155, 255, 0.06)' }} />
-            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} itemGap={12} />
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
             <Bar
               dataKey="equity"
               name="Equity"
