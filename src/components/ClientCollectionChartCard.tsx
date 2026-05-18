@@ -308,9 +308,12 @@ export function ClientCollectionChartCard({
         style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
         styles={{ body: { padding: '18px 18px 18px' } }}
       >
-        <Title level={5} style={{ marginTop: 0, marginBottom: 8 }}>
-          Client collection
+        <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+          Invoice Collection
         </Title>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 13, lineHeight: 1.5 }}>
+          Paid and unpaid amounts by project. Click a bar to view sub-projects.
+        </Text>
         <Text type="secondary" style={{ fontSize: 13 }}>
           No clients match the current sales filter in this view.
         </Text>
@@ -335,9 +338,14 @@ export function ClientCollectionChartCard({
         }}
       >
         <div>
-          <Title level={5} style={{ marginTop: 0, marginBottom: 0 }}>
-            {drillGroup ? `${drillGroup.label} · projects` : 'Client collection'}
+          <Title level={5} style={{ marginTop: 0, marginBottom: drillGroup ? 0 : 4 }}>
+            {drillGroup ? `${drillGroup.label} · projects` : 'Invoice Collection'}
           </Title>
+          {!drillGroup ? (
+            <Text type="secondary" style={{ display: 'block', fontSize: 13, lineHeight: 1.5 }}>
+              Paid and unpaid amounts by project. Click a bar to view sub-projects.
+            </Text>
+          ) : null}
         </div>
         {drillGroup ? (
           <Button

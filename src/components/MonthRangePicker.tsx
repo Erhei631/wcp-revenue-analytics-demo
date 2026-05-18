@@ -11,7 +11,15 @@ export type MonthRangeValue = {
   end: Dayjs;
 };
 
-export type QuickPresetKey = 'last3' | 'ytd' | 'last6' | 'last12' | 'lastYear';
+export type QuickPresetKey =
+  | 'last3'
+  | 'ytd'
+  | 'last6'
+  | 'last12'
+  | 'year2026'
+  | 'year2025'
+  | 'q2_2026'
+  | 'q1_2026';
 
 type MonthRangePickerProps = {
   value: MonthRangeValue;
@@ -23,12 +31,35 @@ type MonthRangePickerProps = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
-const QUICK_PRESETS: { key: QuickPresetKey; label: string }[] = [
-  { key: 'last3', label: 'Last 3 months' },
-  { key: 'ytd', label: 'Year to date' },
-  { key: 'last6', label: 'Last 6 months' },
-  { key: 'last12', label: 'Last 12 months' },
-  { key: 'lastYear', label: 'Last year' },
+type PresetSidebarSection = {
+  title: string;
+  items: { key: QuickPresetKey; label: string }[];
+};
+
+const PRESET_SIDEBAR_SECTIONS: PresetSidebarSection[] = [
+  {
+    title: 'Quick select',
+    items: [
+      { key: 'last3', label: 'Last 3 months' },
+      { key: 'ytd', label: 'Year to date' },
+      { key: 'last6', label: 'Last 6 months' },
+      { key: 'last12', label: 'Last 12 months' },
+    ],
+  },
+  {
+    title: 'Natural Year',
+    items: [
+      { key: 'year2026', label: '2026' },
+      { key: 'year2025', label: '2025' },
+    ],
+  },
+  {
+    title: 'Natural Year',
+    items: [
+      { key: 'q2_2026', label: 'Q2 2026' },
+      { key: 'q1_2026', label: 'Q1 2026' },
+    ],
+  },
 ];
 
 const chevronNavBtnStyle: CSSProperties = {
@@ -86,13 +117,26 @@ export function resolveMonthPreset(preset: QuickPresetKey, ref: Dayjs): MonthRan
       return { start: end.subtract(5, 'month'), end };
     case 'last12':
       return { start: end.subtract(11, 'month'), end };
-    case 'lastYear': {
-      const year = end.year() - 1;
+    case 'year2026':
       return {
-        start: dayjs().year(year).month(0).startOf('month'),
-        end: dayjs().year(year).month(11).startOf('month'),
+        start: dayjs().year(2026).month(0).startOf('month'),
+        end: dayjs().year(2026).month(11).startOf('month'),
       };
-    }
+    case 'year2025':
+      return {
+        start: dayjs().year(2025).month(0).startOf('month'),
+        end: dayjs().year(2025).month(11).startOf('month'),
+      };
+    case 'q1_2026':
+      return {
+        start: dayjs().year(2026).month(0).startOf('month'),
+        end: dayjs().year(2026).month(2).startOf('month'),
+      };
+    case 'q2_2026':
+      return {
+        start: dayjs().year(2026).month(3).startOf('month'),
+        end: dayjs().year(2026).month(5).startOf('month'),
+      };
     default:
       return { start: end.startOf('year'), end };
   }
@@ -297,35 +341,48 @@ export function MonthRangePicker({
           padding: '12px 8px 12px 12px',
         }}
       >
-        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 8, paddingLeft: 10 }}>
-          Quick select
-        </Text>
-        {QUICK_PRESETS.map((preset) => {
-          const selected = activePreset === preset.key;
-          return (
-            <button
-              key={preset.key}
-              type="button"
-              onClick={() => handlePreset(preset.key)}
+        {PRESET_SIDEBAR_SECTIONS.map((section, sectionIndex) => (
+          <div key={`${section.title}-${sectionIndex}`} style={{ marginBottom: sectionIndex < PRESET_SIDEBAR_SECTIONS.length - 1 ? 12 : 0 }}>
+            <Text
+              type="secondary"
               style={{
                 display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 10px',
-                marginBottom: 2,
-                cursor: 'pointer',
-                fontSize: 13,
-                background: selected ? THEME_PRIMARY_MUTED : 'transparent',
-                color: selected ? THEME_PRIMARY : '#595959',
-                fontWeight: selected ? 600 : 400,
+                fontSize: 12,
+                marginBottom: 6,
+                paddingLeft: 10,
+                marginTop: sectionIndex > 0 ? 4 : 0,
               }}
             >
-              {preset.label}
-            </button>
-          );
-        })}
+              {section.title}
+            </Text>
+            {section.items.map((preset) => {
+              const selected = activePreset === preset.key;
+              return (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => handlePreset(preset.key)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    marginBottom: 2,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    background: selected ? THEME_PRIMARY_MUTED : 'transparent',
+                    color: selected ? THEME_PRIMARY : '#595959',
+                    fontWeight: selected ? 600 : 400,
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>

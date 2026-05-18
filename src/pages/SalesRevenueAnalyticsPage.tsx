@@ -42,6 +42,12 @@ import {
   type QuickPresetKey,
 } from '../components/MonthRangePicker';
 import { AnalyticsStatBar, type AnalyticsStatItem } from '../components/AnalyticsStatBar';
+import {
+  DEMO_MONTHS,
+  DEMO_PERIOD_LABELS,
+  REPORTING_END,
+  buildAllRepMonthlySeries,
+} from '../data/analyticsDemoSeries';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import {
   CHART_BROWN,
@@ -58,24 +64,17 @@ import { DashboardShell } from '../layout/DashboardShell';
 
 const { Text, Title } = Typography;
 
-const REPORTING_END = dayjs('2026-05-01');
-
-const DEMO_MONTHS: Dayjs[] = [
-  dayjs('2026-01-01'),
-  dayjs('2026-02-01'),
-  dayjs('2026-03-01'),
-  dayjs('2026-04-01'),
-  dayjs('2026-05-01'),
-];
-
-const PERIODS = DEMO_MONTHS.map((m) => m.format('MMM YY')) as readonly string[];
+const PERIODS = DEMO_PERIOD_LABELS;
 
 const PRESET_LABELS: Record<QuickPresetKey, string> = {
   last3: 'Last 3 months',
   ytd: 'Year to date',
   last6: 'Last 6 months',
   last12: 'Last 12 months',
-  lastYear: 'Last year',
+  year2026: '2026',
+  year2025: '2025',
+  q2_2026: 'Q2 2026',
+  q1_2026: 'Q1 2026',
 };
 
 const REP_DEFS = [
@@ -127,12 +126,7 @@ const CLIENT_TAKE_OF_OWNER: Record<ClientId, number> = {
 
 const REP_KEYS: RepKey[] = ['alice', 'bob', 'carol', 'david'];
 
-const BREAKDOWN: Record<RepKey, readonly [number, number, number, number, number]> = {
-  alice: [12_200, 15_800, 11_400, 18_600, 21_000],
-  bob: [8400, 9200, 11_800, 10_200, 13_500],
-  carol: [5100, 6800, 7200, 8900, 6400],
-  david: [3200, 4100, 5800, 4600, 7200],
-};
+const BREAKDOWN: Record<RepKey, number[]> = buildAllRepMonthlySeries();
 
 /** Demo analytics are sliced from a fixed monthly series by the selected month range. */
 type BuiltView = {
@@ -439,7 +433,7 @@ function buildAnalyticsExportRows(input: AnalyticsExportInput) {
   );
 
   if (input.includeSystemTotal) {
-    rows.push(['System Total', ...input.system.map(String), String(input.viewTotal)]);
+    rows.push(['Revenue Total', ...input.system.map(String), String(input.viewTotal)]);
   }
 
   return rows;
@@ -1488,7 +1482,7 @@ export default function SalesRevenueAnalyticsPage() {
                     <Table.Summary>
                       <Table.Summary.Row style={{ background: 'rgba(70, 155, 255, 0.08)' }}>
                         <Table.Summary.Cell index={0}>
-                          <Text strong>System Total</Text>
+                          <Text strong>Revenue Total</Text>
                         </Table.Summary.Cell>
                         {view.periods.map((p, idx) => (
                           <Table.Summary.Cell key={p} index={idx + 1} align="right">
