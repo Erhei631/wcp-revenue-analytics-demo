@@ -43,12 +43,29 @@ import {
 } from '../components/MonthRangePicker';
 import { AnalyticsStatBar, type AnalyticsStatItem } from '../components/AnalyticsStatBar';
 import {
+  DEMO_MONTH_COUNT,
   DEMO_MONTHS,
   DEMO_PERIOD_LABELS,
   REPORTING_END,
   buildAllRepMonthlySeries,
 } from '../data/analyticsDemoSeries';
+import {
+  blendFeeProfiles,
+  cashPaidFromServiceFeeTotal,
+  feeProfileForClientId,
+} from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
+import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
+import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
+import {
+  buildClientMonthlyFromReps,
+  computeRangeChangePct,
+  DEMO_CLIENT_CATALOG,
+  DEMO_DECLINING_CLIENT_RANKS,
+  shapeDecliningClientSeries,
+  DEMO_CLIENT_IDS,
+  DEMO_CLIENT_OWNER,
+} from '../data/demoClientCatalog';
 import {
   CHART_BROWN,
   CHART_BROWN_SOFT,
@@ -89,35 +106,18 @@ type RepKey = (typeof REP_DEFS)[number]['key'];
 /** Empty array means all sales reps are included. */
 export type SalesFilter = RepKey[];
 
-const CLIENTS = [
-  { id: 'acme', name: 'Acme Corp · ERP rollout' },
-  { id: 'globex', name: 'Globex · Data platform' },
-  { id: 'initech', name: 'Initech · Billing integration' },
-  { id: 'umbrella', name: 'Umbrella · Mobile app' },
-] as const;
-
-type ClientId = (typeof CLIENTS)[number]['id'];
+type ClientId = (typeof DEMO_CLIENT_IDS)[number];
 
 /** Empty array means all clients & projects are included. */
 export type ClientFilter = ClientId[];
 
-const CLIENT_IDS: ClientId[] = CLIENTS.map((c) => c.id);
-
-/** One owning sales rep per client; revenue is 100% on that rep’s row for this client (demo share of their book). */
-const CLIENT_OWNER: Record<ClientId, RepKey> = {
-  acme: 'alice',
-  globex: 'bob',
-  initech: 'carol',
-  umbrella: 'david',
-};
-
-const CLIENT_DEFS = CLIENTS.map((c) => {
-  const owner = REP_DEFS.find((r) => r.key === CLIENT_OWNER[c.id]);
-  return { key: c.id, name: c.name, color: owner?.color ?? CHART_PURPLE };
-});
+const CLIENTS = DEMO_CLIENT_CATALOG.map((c) => ({ id: c.id, name: c.name }));
+const CLIENT_IDS: ClientId[] = DEMO_CLIENT_IDS;
+const CLIENT_OWNER = DEMO_CLIENT_OWNER;
+const CLIENT_DEFS = DEMO_CLIENT_CATALOG.map((c) => ({ key: c.id, name: c.name, color: c.color }));
 
 /** Portion of the owner’s posted monthly revenue attributed to this account (rest = other deals, not listed). */
-const CLIENT_TAKE_OF_OWNER: Record<ClientId, number> = {
+const CLIENT_TAKE_OF_OWNER: Partial<Record<ClientId, number>> = {
   acme: 0.58,
   globex: 0.62,
   initech: 0.55,
@@ -127,6 +127,11 @@ const CLIENT_TAKE_OF_OWNER: Record<ClientId, number> = {
 const REP_KEYS: RepKey[] = ['alice', 'bob', 'carol', 'david'];
 
 const BREAKDOWN: Record<RepKey, number[]> = buildAllRepMonthlySeries();
+
+const CLIENT_MONTHLY_BASE = buildClientMonthlyFromReps(
+  Object.fromEntries(REP_KEYS.map((k) => [k, [...BREAKDOWN[k]]])) as Record<RepKey, number[]>,
+  DEMO_MONTH_COUNT,
+);
 
 /** Demo analytics are sliced from a fixed monthly series by the selected month range. */
 type BuiltView = {
@@ -160,26 +165,6 @@ function monthInRange(month: Dayjs, range: MonthRangeValue) {
   return key >= startKey && key <= endKey;
 }
 
-function buildClientRepMonthlyExclusive(): Record<ClientId, Record<RepKey, number[]>> {
-  const out = {} as Record<ClientId, Record<RepKey, number[]>>;
-  for (const c of CLIENT_IDS) {
-    out[c] = {
-      alice: PERIODS.map(() => 0),
-      bob: PERIODS.map(() => 0),
-      carol: PERIODS.map(() => 0),
-      david: PERIODS.map(() => 0),
-    };
-    const owner = CLIENT_OWNER[c];
-    const take = CLIENT_TAKE_OF_OWNER[c];
-    for (let mi = 0; mi < PERIODS.length; mi++) {
-      out[c][owner][mi] = Math.round(BREAKDOWN[owner][mi] * take);
-    }
-  }
-  return out;
-}
-
-const CLIENT_REP_MONTHLY = buildClientRepMonthlyExclusive();
-
 function isAllClientsSelected(clientIds: ClientFilter) {
   return clientIds.length === 0 || clientIds.length === CLIENT_IDS.length;
 }
@@ -198,11 +183,9 @@ function monthlyByRepForClients(clientIds: ClientFilter): Record<RepKey, number[
   ) as Record<RepKey, number[]>;
 
   for (const id of clientIds) {
-    const slice = CLIENT_REP_MONTHLY[id];
-    for (const k of REP_KEYS) {
-      for (let i = 0; i < PERIODS.length; i++) {
-        merged[k][i] += slice[k][i];
-      }
+    const owner = CLIENT_OWNER[id];
+    for (let i = 0; i < PERIODS.length; i++) {
+      merged[owner][i] += CLIENT_MONTHLY_BASE[id][i];
     }
   }
 
@@ -212,8 +195,7 @@ function monthlyByRepForClients(clientIds: ClientFilter): Record<RepKey, number[
 function monthlyByClientForClients(clientIds: ClientFilter): Record<ClientId, number[]> {
   return Object.fromEntries(
     CLIENT_IDS.map((id) => {
-      const slice = CLIENT_REP_MONTHLY[id];
-      const values = PERIODS.map((_, i) => REP_KEYS.reduce((sum, k) => sum + slice[k][i], 0));
+      const values = [...CLIENT_MONTHLY_BASE[id]];
       if (isAllClientsSelected(clientIds) || clientIds.includes(id)) {
         return [id, values];
       }
@@ -312,18 +294,8 @@ function buildResolvedView(
   };
 }
 
-function bucketLabel() {
-  return 'Monthly';
-}
-
 function money(n: number) {
   return `$${n.toLocaleString('en-US')}`;
-}
-
-function personDisplayName(fullName: string) {
-  const trimmed = fullName.trim();
-  if (!trimmed) return fullName;
-  return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
 function cellToCsv(value: ReactNode) {
@@ -374,7 +346,7 @@ type AnalyticsExportInput = {
   system: number[];
   totalTrend: { period: string; revenue: number }[];
   multiLine: Array<{ period: string } & Record<RepKey, number>>;
-  multiLineClient: Array<{ period: string } & Record<ClientId, number>>;
+  multiLineClient: Array<{ period: string } & Partial<Record<ClientId, number>>>;
   tableRows: RevenueBreakdownRow[];
   viewTotal: number;
   includeSystemTotal: boolean;
@@ -420,7 +392,7 @@ function buildAnalyticsExportRows(input: AnalyticsExportInput) {
     ['Period', ...CLIENT_DEFS.map((client) => client.name)],
     ...input.multiLineClient.map((row) => [
       row.period,
-      ...CLIENT_IDS.map((id) => String(row[id])),
+      ...CLIENT_IDS.map((id) => String(row[id] ?? 0)),
     ]),
     [],
     ['Revenue Breakdown'],
@@ -495,7 +467,7 @@ function breakdownForCell(repKey: RepKey, amount: number, clientIds: ClientFilte
 
   const projects = owned.map((id) => ({
     name: CLIENTS.find((c) => c.id === id)?.name ?? id,
-    weight: CLIENT_TAKE_OF_OWNER[id],
+    weight: CLIENT_TAKE_OF_OWNER[id] ?? 1,
   }));
   return splitAmountByProjects(amount, projects);
 }
@@ -519,6 +491,7 @@ type ClientBreakdownRow = {
   name: string;
   values: number[];
   total: number;
+  clientId?: ClientId;
 };
 
 function clientRowsForRep(
@@ -534,11 +507,13 @@ function clientRowsForRep(
       const cellLines = breakdownForCell(repKey, amount, clientIds);
       return cellLines.find((line) => line.project === project)?.revenue ?? 0;
     });
+    const matchedClient = CLIENTS.find((c) => c.name === project);
     return {
       key: `${repKey}::${project}`,
       name: project,
       values: childValues,
       total: childValues.reduce((a, b) => a + b, 0),
+      clientId: matchedClient?.id,
     };
   });
 }
@@ -556,14 +531,6 @@ function maxChartValue(system: number[], byRep: Record<RepKey, number[]>) {
   let max = maxSeries(system);
   for (const k of REP_KEYS) {
     max = Math.max(max, maxSeries(byRep[k]));
-  }
-  return max;
-}
-
-function maxClientChartValue(byClient: Record<ClientId, number[]>) {
-  let max = 0;
-  for (const id of CLIENT_IDS) {
-    max = Math.max(max, maxSeries(byClient[id]));
   }
   return max;
 }
@@ -704,36 +671,6 @@ function IndividualSalesTrendTooltip({
   );
 }
 
-function IndividualClientTrendTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: ReadonlyArray<{ dataKey?: string | number | ((obj: unknown) => unknown); value?: unknown }>;
-  label?: string | number;
-}) {
-  if (!active || !payload?.length) return null;
-
-  const rows = CLIENT_DEFS.flatMap((client) => {
-    const entry = payload.find((p) => p.dataKey === client.key);
-    if (!entry) return [];
-    return [{ client, value: Number(entry.value ?? 0) }];
-  });
-
-  if (rows.length === 0) return null;
-
-  return (
-    <div style={chartTooltipShellStyle}>
-      <div style={{ fontWeight: 600, color: '#262626', marginBottom: 10, fontSize: 13 }}>{label}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {rows.map(({ client, value }) => (
-          <ChartTooltipSeriesRow key={client.key} color={client.color} name={client.name} amount={value} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function TotalRevenueTrendTooltip({
   active,
@@ -794,6 +731,15 @@ type RepTableRow = RevenueBreakdownRow & { rowType: 'rep' };
 type ClientTableRow = ClientBreakdownRow & { rowType: 'client'; parentKey: RepKey };
 type DisplayRow = RepTableRow | ClientTableRow;
 
+function clientIdForDisplayRow(record: DisplayRow): ClientId | undefined {
+  if (record.rowType !== 'client') return undefined;
+  return record.clientId ?? CLIENTS.find((c) => c.name === record.name)?.id;
+}
+
+function repRowExpandable(record: RepTableRow, selectedClientIds: ClientFilter) {
+  return clientRowsForRep(record.key, record.values, selectedClientIds).length > 0;
+}
+
 export default function SalesRevenueAnalyticsPage() {
   const [monthRange, setMonthRange] = useState<MonthRangeValue>(() => resolveMonthPreset('ytd', REPORTING_END));
   const [activePreset, setActivePreset] = useState<QuickPresetKey | null>('ytd');
@@ -831,12 +777,6 @@ export default function SalesRevenueAnalyticsPage() {
     onLegendClick: onSalesLegendClick,
     legendFormatter: salesLegendFormatter,
   } = useTrendLegendToggle(`${trendLegendResetKey}|sales`);
-  const {
-    hiddenKeys: hiddenClientTrendKeys,
-    onLegendClick: onClientLegendClick,
-    legendFormatter: clientLegendFormatter,
-  } = useTrendLegendToggle(`${trendLegendResetKey}|client`);
-
   const primarySeries = view.system;
 
   const totalTrendData = useMemo(
@@ -860,10 +800,7 @@ export default function SalesRevenueAnalyticsPage() {
     () =>
       view.periods.map((p, i) => ({
         period: p,
-        acme: view.byClient.acme[i],
-        globex: view.byClient.globex[i],
-        initech: view.byClient.initech[i],
-        umbrella: view.byClient.umbrella[i],
+        ...Object.fromEntries(CLIENT_IDS.map((id) => [id, view.byClient[id][i] ?? 0])),
       })),
     [filterScopeKey, view.byClient, view.periods],
   );
@@ -922,29 +859,19 @@ export default function SalesRevenueAnalyticsPage() {
             );
           }
 
-          const expandable = clientRowsForRep(record.key, record.values, selectedClientIds).length > 0;
+          const expandable = repRowExpandable(record, selectedClientIds);
           const expanded = expandedRepKeys.includes(record.key);
 
           return (
             <Space size={10} align="center">
               {expandable ? (
-                <button
-                  type="button"
-                  aria-expanded={expanded}
-                  aria-label={
-                    expanded
-                      ? `Collapse client breakdown for ${name}`
-                      : `Expand client breakdown for ${name}`
-                  }
-                  onClick={() => toggleRepExpanded(record.key)}
-                  className="analytics-revenue-expand-btn"
-                >
+                <span className="analytics-revenue-expand-icon" aria-hidden>
                   {expanded ? (
                     <CaretDownOutlined style={{ fontSize: 11 }} />
                   ) : (
                     <CaretRightOutlined style={{ fontSize: 11 }} />
                   )}
-                </button>
+                </span>
               ) : (
                 <span className="analytics-revenue-expand-spacer" aria-hidden />
               )}
@@ -970,7 +897,13 @@ export default function SalesRevenueAnalyticsPage() {
         render: (_: unknown, record: DisplayRow) => {
           const amount = record.values[idx] ?? 0;
           if (record.rowType === 'client') {
-            return <Text type="secondary">{money(amount)}</Text>;
+            return (
+              <ServiceFeeBreakdownCell
+                serviceFeeTotal={amount}
+                clientId={clientIdForDisplayRow(record)}
+                muted
+              />
+            );
           }
           return <Text>{money(amount)}</Text>;
         },
@@ -982,7 +915,13 @@ export default function SalesRevenueAnalyticsPage() {
         width: 140,
         render: (_: unknown, record: DisplayRow) => {
           if (record.rowType === 'client') {
-            return <Text type="secondary">{money(record.total)}</Text>;
+            return (
+              <ServiceFeeBreakdownCell
+                serviceFeeTotal={record.total}
+                clientId={clientIdForDisplayRow(record)}
+                muted
+              />
+            );
           }
           return <Text strong>{money(record.total)}</Text>;
         },
@@ -1001,16 +940,22 @@ export default function SalesRevenueAnalyticsPage() {
     [isAllReps, primarySeries, view.byRep, view.system],
   );
 
-  const clientMultiChartMax = useMemo(() => maxClientChartValue(view.byClient), [view.byClient]);
-
   const viewTotal = useMemo(() => view.system.reduce((a, b) => a + b, 0), [view.system]);
 
   const primaryTotal = useMemo(() => primarySeries.reduce((a, b) => a + b, 0), [primarySeries]);
 
-  const periodCount = view.periods.length;
-  const avgPerPeriod = Math.round(primaryTotal / Math.max(1, periodCount));
-  const latestValue = primarySeries[primarySeries.length - 1] ?? 0;
-  const latestLabel = view.periods[view.periods.length - 1] ?? '—';
+  const feeProfileForScope = useMemo(() => {
+    if (!isAllClientsSelected(selectedClientIds) && selectedClientIds.length === 1) {
+      return feeProfileForClientId(selectedClientIds[0]);
+    }
+    const ids = isAllClientsSelected(selectedClientIds) ? CLIENT_IDS : selectedClientIds;
+    return blendFeeProfiles(ids.map((id) => feeProfileForClientId(id)));
+  }, [selectedClientIds]);
+
+  const cashPaidTotal = useMemo(
+    () => cashPaidFromServiceFeeTotal(primaryTotal, feeProfileForScope),
+    [feeProfileForScope, primaryTotal],
+  );
 
   const topRep = useMemo(() => {
     const candidates = isAllReps
@@ -1029,6 +974,37 @@ export default function SalesRevenueAnalyticsPage() {
   const visibleClientTrendDefs = useMemo(
     () => clientsVisibleForSales(selectedClientIds, activeSalesKeys),
     [activeSalesKeys, selectedClientIds],
+  );
+
+  const clientRankRows = useMemo(
+    () =>
+      visibleClientTrendDefs
+        .map((client) => {
+          const raw = view.byClient[client.key] ?? [];
+          const total = raw.reduce((sum, value) => sum + value, 0);
+          return {
+            key: client.key,
+            name: client.name,
+            color: client.color,
+            total,
+            series: raw,
+          };
+        })
+        .filter((row) => row.total > 0)
+        .sort((a, b) => b.total - a.total)
+        .map((row, index) => {
+          const rank = index + 1;
+          const series = DEMO_DECLINING_CLIENT_RANKS.has(rank)
+            ? shapeDecliningClientSeries(row.series)
+            : row.series;
+          return {
+            ...row,
+            rank,
+            series,
+            rangeChangePct: computeRangeChangePct(series),
+          };
+        }),
+    [filterScopeKey, visibleClientTrendDefs, view.byClient],
   );
 
   const clientScopeLabel = useMemo(
@@ -1071,32 +1047,21 @@ export default function SalesRevenueAnalyticsPage() {
         rightLabel: isAllReps ? 'Team' : 'Rep',
       },
       {
-        key: 'avg-period',
-        title: 'Avg per Period',
-        value: `$${avgPerPeriod.toLocaleString('en-US')}`,
+        key: 'cash-paid',
+        title: 'Cash Paid',
+        value: `$${cashPaidTotal.toLocaleString('en-US')}`,
         valueVariant: 'metric',
-        note: `${periodCount} period${periodCount === 1 ? '' : 's'} in this view`,
-        rightLabel: bucketLabel(),
-      },
-      {
-        key: 'latest-period',
-        title: 'Latest Period',
-        value: `$${latestValue.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-        note: 'Last month in range',
-        rightLabel: latestLabel,
       },
       {
         key: 'top-or-share',
         title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
-        value: isSingleRep ? `${shareOfTeam ?? 0}%` : personDisplayName(topRep.name),
-        valueTitle: !isSingleRep && topRep.name !== '—' ? topRep.name : undefined,
+        value: isSingleRep ? `${shareOfTeam ?? 0}%` : topRep.name,
         valueVariant: isSingleRep ? 'metric' : 'person',
         rightLabel: isSingleRep ? money(viewTotal) : money(topRep.value),
         rightLabelTone: isSingleRep ? 'positive' : 'default',
       },
     ],
-    [avgPerPeriod, isSingleRep, latestLabel, latestValue, periodCount, primaryTotal, shareOfTeam, topRep, viewTotal],
+    [cashPaidTotal, isAllReps, isSingleRep, primaryTotal, shareOfTeam, topRep, viewTotal],
   );
 
   const handleExportAnalytics = useCallback(() => {
@@ -1337,7 +1302,13 @@ export default function SalesRevenueAnalyticsPage() {
               By client
             </button>
           </div>
-          <div style={{ width: '100%', height: 340 }}>
+          <div
+            style={{
+              width: '100%',
+              minHeight: 340,
+              height: revenueTrendView === 'sales' ? 340 : undefined,
+            }}
+          >
             {revenueTrendView === 'sales' ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -1387,52 +1358,12 @@ export default function SalesRevenueAnalyticsPage() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  key={`client-${filterScopeKey}`}
-                  data={multiLineClientData}
-                  margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
-                  <YAxis
-                    tickFormatter={(v) => axisMoneyShort(Number(v))}
-                    domain={[0, Math.max(500, Math.ceil(clientMultiChartMax * 1.12))]}
-                    tick={{ fontSize: 12 }}
-                    width={56}
-                    axisLine={{ stroke: '#e8e8e8' }}
-                  />
-                  <RTooltip
-                    content={({ active, payload, label }) => (
-                      <IndividualClientTrendTooltip active={active} payload={payload} label={label} />
-                    )}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
-                    onClick={onClientLegendClick}
-                    formatter={clientLegendFormatter}
-                  />
-                  {visibleClientTrendDefs.map((c) => {
-                    const clientTotal = view.byClient[c.key].reduce((a, b) => a + b, 0);
-                    if (clientTotal === 0) return null;
-                    const hidden = hiddenClientTrendKeys.has(c.key);
-                    return (
-                      <Line
-                        key={c.key}
-                        type="monotone"
-                        dataKey={c.key}
-                        name={c.name}
-                        stroke={c.color}
-                        strokeWidth={2}
-                        strokeOpacity={hidden ? 0.2 : 1}
-                        hide={hidden}
-                        dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: c.color }}
-                        connectNulls
-                      />
-                    );
-                  })}
-                </LineChart>
-              </ResponsiveContainer>
+              <RevenueByClientRankList
+                key={`client-rank-${filterScopeKey}`}
+                rows={clientRankRows}
+                periods={view.periods}
+                filterScopeKey={filterScopeKey}
+              />
             )}
           </div>
         </Card>
@@ -1463,9 +1394,26 @@ export default function SalesRevenueAnalyticsPage() {
             rowKey="key"
             columns={columns}
             dataSource={displayTableRows}
-            rowClassName={(record) =>
-              record.rowType === 'client' ? 'analytics-revenue-client-row' : ''
-            }
+            rowClassName={(record) => {
+              if (record.rowType === 'client') return 'analytics-revenue-client-row';
+              return repRowExpandable(record, selectedClientIds)
+                ? 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
+                : 'analytics-revenue-rep-row';
+            }}
+            onRow={(record) => {
+              if (record.rowType !== 'rep' || !repRowExpandable(record, selectedClientIds)) {
+                return {};
+              }
+              const expanded = expandedRepKeys.includes(record.key);
+              return {
+                onClick: () => toggleRepExpanded(record.key),
+                style: { cursor: 'pointer' },
+                'aria-expanded': expanded,
+                'aria-label': expanded
+                  ? `Collapse client breakdown for ${record.name}`
+                  : `Expand client breakdown for ${record.name}`,
+              };
+            }}
             pagination={false}
             size="middle"
             bordered
@@ -1482,7 +1430,7 @@ export default function SalesRevenueAnalyticsPage() {
                 ? () => (
                     <Table.Summary>
                       <Table.Summary.Row style={{ background: 'rgba(70, 155, 255, 0.08)' }}>
-                        <Table.Summary.Cell index={0}>
+                        <Table.Summary.Cell index={0} align="right">
                           <Text strong>Revenue Total</Text>
                         </Table.Summary.Cell>
                         {view.periods.map((p, idx) => (

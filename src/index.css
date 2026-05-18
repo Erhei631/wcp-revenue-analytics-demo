@@ -117,6 +117,12 @@ svg {
   gap: 4px;
 }
 
+/* Hide empty inline-search suffix slot (removes ~12px gap beside tags) */
+.analytics-toolbar-select.ant-select-multiple:not(.ant-select-focused):not(.ant-select-open)
+  .ant-select-selection-overflow-item-suffix {
+  display: none !important;
+}
+
 .analytics-toolbar-select.ant-select-multiple .ant-select-selection-item {
   color: #262626 !important;
   background: #f5f5f5 !important;
@@ -171,7 +177,7 @@ svg {
 /* Sales analytics KPI bar */
 .analytics-stat-bar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   background: #fff;
   border: 1px solid #f0f0f0;
@@ -325,6 +331,158 @@ svg {
   outline-offset: -2px;
 }
 
+/* Revenue by — client rank list */
+.revenue-by-client-rank {
+  --rank-trend-up: var(--theme-primary, #469bff);
+  --rank-trend-down: #edab00;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  max-height: 560px;
+}
+
+.revenue-by-client-rank--empty {
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.revenue-by-client-rank__header {
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px minmax(120px, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 0 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.revenue-by-client-rank__body {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+.revenue-by-client-rank__item {
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.revenue-by-client-rank__item:last-child {
+  border-bottom: none;
+}
+
+.revenue-by-client-rank__item.is-expanded {
+  background: #f8f9fc;
+}
+
+.revenue-by-client-rank__row {
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px minmax(120px, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  text-align: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.revenue-by-client-rank__row:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.revenue-by-client-rank__item.is-expanded .revenue-by-client-rank__row:hover {
+  background: transparent;
+}
+
+.revenue-by-client-rank__col--expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.revenue-by-client-rank__detail {
+  padding: 4px 12px 14px 38px;
+}
+
+.revenue-by-client-rank__detail-chart {
+  width: 100%;
+  height: 200px;
+}
+
+.revenue-by-client-rank__col--name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.revenue-by-client-rank__rank {
+  color: #bfbfbf;
+  font-size: 12px;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.revenue-by-client-rank__name {
+  color: #262626;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.revenue-by-client-rank__col--total {
+  text-align: right;
+}
+
+.revenue-by-client-rank__total {
+  font-size: 16px !important;
+  color: #1f1f1f !important;
+  letter-spacing: -0.3px;
+}
+
+.revenue-by-client-rank__col--trend {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.revenue-by-client-rank__col--change {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.revenue-by-client-rank__info {
+  margin-left: 4px;
+  color: #bfbfbf;
+  font-size: 12px;
+  cursor: help;
+}
+
+.revenue-by-client-rank__change {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.revenue-by-client-rank__change--up {
+  color: var(--rank-trend-up, var(--theme-primary, #469bff));
+}
+
+.revenue-by-client-rank__change--down {
+  color: var(--rank-trend-down, #edab00);
+}
+
+.revenue-by-client-rank__sparkline {
+  display: block;
+}
+
 /* Sales revenue analytics — revenue breakdown table */
 .analytics-revenue-table .ant-table-thead > tr > th {
   background: #dfe5ee !important;
@@ -336,26 +494,41 @@ svg {
 
 .analytics-revenue-table .analytics-revenue-client-row > td {
   background: #fafafa;
+  vertical-align: top;
 }
 
-.analytics-revenue-expand-btn {
-  border: none;
-  background: transparent;
-  padding: 0;
+.analytics-revenue-fee-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 96px;
+  margin-left: auto;
+}
+
+.analytics-revenue-fee-cell__total {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.analytics-revenue-fee-cell__part {
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.analytics-revenue-expand-icon {
   width: 18px;
   height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   color: #8c8c8c;
-  border-radius: 4px;
   flex-shrink: 0;
 }
 
-.analytics-revenue-expand-btn:hover {
-  color: #262626;
-  background: rgba(0, 0, 0, 0.04);
+.analytics-revenue-table tr.analytics-revenue-rep-row--expandable:hover > td {
+  background: #fafafa !important;
 }
 
 .analytics-revenue-expand-spacer {

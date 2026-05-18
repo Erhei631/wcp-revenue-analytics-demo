@@ -11,22 +11,23 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { CHART_GREEN, THEME_PRIMARY } from '../constants/chartColors';
+import { THEME_PRIMARY } from '../constants/chartColors';
 
 const { Text, Title } = Typography;
 
-const COLLECTION_PAID = CHART_GREEN;
-const COLLECTION_UNPAID = '#FFB800';
+const FEE_EQUITY = THEME_PRIMARY;
+const FEE_PAID = '#57CEF4';
+const FEE_UNPAID = '#FFB800';
 const DEMO_PERIOD_COUNT = 5;
 
 type RepKey = 'alice' | 'bob' | 'carol' | 'david';
 
-/** Matches toolbar client filter ids on the analytics page. */
-export type AnalyticsClientId = 'acme' | 'globex' | 'initech' | 'umbrella';
+import {
+  DEMO_CLIENT_IDS,
+  type DemoClientId,
+} from '../data/demoClientCatalog';
 
-export type CollectionChartClientFilter = AnalyticsClientId[];
-
-const ANALYTICS_CLIENT_IDS: AnalyticsClientId[] = ['acme', 'globex', 'initech', 'umbrella'];
+export type CollectionChartClientFilter = DemoClientId[];
 
 type CollectionProjectDef = {
   key: string;
@@ -38,8 +39,9 @@ type CollectionClientGroup = {
   key: string;
   label: string;
   owner: RepKey;
-  /** Toolbar client filter id; omitted for demo-only clients (e.g. Edge). */
-  filterClientId?: AnalyticsClientId;
+  /** Toolbar client filter id; omitted for demo-only clients shown only when unfiltered. */
+  filterClientId?: DemoClientId;
+  equity: number;
   paid: number;
   unpaid: number;
   projects: CollectionProjectDef[];
@@ -50,7 +52,8 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'apex',
     label: 'Client Apex',
     owner: 'alice',
-    filterClientId: 'acme',
+    filterClientId: 'apex',
+    equity: 45_000,
     paid: 132_000,
     unpaid: 26_000,
     projects: [
@@ -65,7 +68,8 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'bolt',
     label: 'Client Bolt',
     owner: 'bob',
-    filterClientId: 'globex',
+    filterClientId: 'bolt',
+    equity: 28_000,
     paid: 84_000,
     unpaid: 8_000,
     projects: [
@@ -79,7 +83,8 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'core',
     label: 'Client Core',
     owner: 'carol',
-    filterClientId: 'initech',
+    filterClientId: 'core',
+    equity: 40_000,
     paid: 112_000,
     unpaid: 23_000,
     projects: [
@@ -94,7 +99,8 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'dusk',
     label: 'Client Dusk',
     owner: 'david',
-    filterClientId: 'umbrella',
+    filterClientId: 'dusk',
+    equity: 24_000,
     paid: 68_000,
     unpaid: 12_000,
     projects: [
@@ -108,6 +114,7 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'edge',
     label: 'Client Edge',
     owner: 'bob',
+    equity: 28_000,
     paid: 82_000,
     unpaid: 10_000,
     projects: [
@@ -123,16 +130,39 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
 export type CollectionChartSalesFilter = RepKey[];
 
 function isAllClientsSelected(clientIds: CollectionChartClientFilter) {
-  return clientIds.length === 0 || clientIds.length === ANALYTICS_CLIENT_IDS.length;
+  return clientIds.length === 0 || clientIds.length === DEMO_CLIENT_IDS.length;
 }
 
 type CollectionBarRow = {
   key: string;
   label: string;
+  equity: number;
   paid: number;
   unpaid: number;
-  invoiced: number;
+  /** Cash = Invoice = Paid + Unpaid */
+  cash: number;
+  /** Service Fee Total = Equity + Cash */
+  serviceFeeTotal: number;
 };
+
+function toBarRow(
+  key: string,
+  label: string,
+  equity: number,
+  paid: number,
+  unpaid: number,
+): CollectionBarRow {
+  const cash = paid + unpaid;
+  return {
+    key,
+    label,
+    equity,
+    paid,
+    unpaid,
+    cash,
+    serviceFeeTotal: equity + cash,
+  };
+}
 
 function money(n: number) {
   return `$${n.toLocaleString('en-US')}`;
@@ -147,25 +177,26 @@ function scaleForPeriod(amount: number, periodCount: number) {
   return Math.round(amount * (periodCount / DEMO_PERIOD_COUNT));
 }
 
-function splitByWeights(totalPaid: number, totalUnpaid: number, projects: CollectionProjectDef[]) {
+function splitByWeights(
+  totalEquity: number,
+  totalPaid: number,
+  totalUnpaid: number,
+  projects: CollectionProjectDef[],
+): CollectionBarRow[] {
   const totalWeight = projects.reduce((s, p) => s + p.weight, 0);
+  let equityLeft = totalEquity;
   let paidLeft = totalPaid;
   let unpaidLeft = totalUnpaid;
 
   return projects.map((project, index) => {
     const isLast = index === projects.length - 1;
+    const equity = isLast ? equityLeft : Math.round((totalEquity * project.weight) / totalWeight);
     const paid = isLast ? paidLeft : Math.round((totalPaid * project.weight) / totalWeight);
     const unpaid = isLast ? unpaidLeft : Math.round((totalUnpaid * project.weight) / totalWeight);
+    equityLeft -= equity;
     paidLeft -= paid;
     unpaidLeft -= unpaid;
-    const invoiced = paid + unpaid;
-    return {
-      key: project.key,
-      label: project.name,
-      paid,
-      unpaid,
-      invoiced,
-    };
+    return toBarRow(project.key, project.name, equity, paid, unpaid);
   });
 }
 
@@ -179,7 +210,7 @@ function matchesClientFilter(group: CollectionClientGroup, clientIds: Collection
   return clientIds.includes(group.filterClientId);
 }
 
-function collectionGroupForClient(clientId: AnalyticsClientId) {
+function collectionGroupForClient(clientId: DemoClientId) {
   return COLLECTION_CLIENT_GROUPS.find((g) => g.filterClientId === clientId) ?? null;
 }
 
@@ -195,31 +226,22 @@ function buildClientRows(
     (g) => (allSales || salesSet.has(g.owner)) && matchesClientFilter(g, clientIds),
   )
     .map((group) => {
+      const equity = scaleForPeriod(group.equity, periodCount);
       const paid = scaleForPeriod(group.paid, periodCount);
       const unpaid = scaleForPeriod(group.unpaid, periodCount);
-      return {
-        key: group.key,
-        label: group.label,
-        paid,
-        unpaid,
-        invoiced: paid + unpaid,
-      };
+      return toBarRow(group.key, group.label, equity, paid, unpaid);
     })
-    .filter((row) => row.invoiced > 0);
+    .filter((row) => row.serviceFeeTotal > 0);
 }
 
 function buildProjectRows(clientKey: string, periodCount: number): CollectionBarRow[] {
   const group = COLLECTION_CLIENT_GROUPS.find((g) => g.key === clientKey);
   if (!group) return [];
 
+  const equity = scaleForPeriod(group.equity, periodCount);
   const paid = scaleForPeriod(group.paid, periodCount);
   const unpaid = scaleForPeriod(group.unpaid, periodCount);
-  return splitByWeights(paid, unpaid, group.projects);
-}
-
-function collectionRate(paid: number, invoiced: number) {
-  if (invoiced <= 0) return 0;
-  return Math.round((paid / invoiced) * 100);
+  return splitByWeights(equity, paid, unpaid, group.projects);
 }
 
 const chartTooltipShellStyle: CSSProperties = {
@@ -227,7 +249,13 @@ const chartTooltipShellStyle: CSSProperties = {
   borderRadius: 8,
   padding: '12px 14px',
   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-  minWidth: 188,
+  minWidth: 220,
+};
+
+const chartTooltipDividerStyle: CSSProperties = {
+  height: 1,
+  background: '#f0f0f0',
+  margin: '10px 0',
 };
 
 function CollectionTooltip({
@@ -242,47 +270,63 @@ function CollectionTooltip({
   const row = payload[0]?.payload;
   if (!row) return null;
 
-  const rate = collectionRate(row.paid, row.invoiced);
-
   return (
     <div style={chartTooltipShellStyle}>
-      <div style={{ fontWeight: 600, color: '#262626', marginBottom: 10, fontSize: 13 }}>{row.label}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-        <TooltipRow color={THEME_PRIMARY} label="Invoiced" value={money(row.invoiced)} />
-        <TooltipRow color={COLLECTION_PAID} label="Paid" value={money(row.paid)} />
-        <TooltipRow color={COLLECTION_UNPAID} label="Unpaid" value={money(row.unpaid)} valueTone="danger" />
+      <div
+        style={{
+          fontWeight: 600,
+          color: '#262626',
+          fontSize: 13,
+          paddingBottom: 10,
+          borderBottom: '1px solid #f0f0f0',
+        }}
+      >
+        {row.label}
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c' }}>Collection rate: {rate}%</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, paddingTop: 10 }}>
+        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} />
+        <div style={chartTooltipDividerStyle} />
+        <TooltipRow color={FEE_PAID} label="Cash Paid" value={money(row.paid)} />
+        <TooltipRow color={FEE_UNPAID} label="Cash Unpaid" value={money(row.unpaid)} />
+        <TooltipRow label="Cash total" value={money(row.cash)} />
+      </div>
+      <div style={chartTooltipDividerStyle} />
+      <TooltipRow label="Service Fee Total" value={money(row.serviceFeeTotal)} strong />
     </div>
   );
 }
-
 function TooltipRow({
   color,
   label,
   value,
   valueTone,
+  strong,
 }: {
-  color: string;
+  color?: string;
   label: string;
   value: string;
   valueTone?: 'danger';
+  strong?: boolean;
 }) {
+  const valueColor = valueTone === 'danger' ? '#cf1322' : '#1f1f1f';
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#595959' }}>
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 999,
-            background: color,
-            flexShrink: 0,
-          }}
-        />
-        {label}
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#595959', minWidth: 0 }}>
+        {color ? (
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 2,
+              background: color,
+              flexShrink: 0,
+            }}
+          />
+        ) : null}
+        <span style={{ fontWeight: strong ? 600 : 400, color: strong ? '#262626' : '#595959' }}>{label}</span>
       </span>
-      <span style={{ fontWeight: 600, color: valueTone === 'danger' ? '#cf1322' : '#1f1f1f' }}>{value}</span>
+      <span style={{ fontWeight: strong ? 700 : 600, color: valueColor, flexShrink: 0 }}>{value}</span>
     </div>
   );
 }
@@ -331,7 +375,7 @@ export function ClientCollectionChartCard({
 
   const chartRows = activeDrillKey ? projectRows : clientRows;
   const chartMax = useMemo(() => {
-    const max = chartRows.reduce((m, row) => Math.max(m, row.invoiced), 0);
+    const max = chartRows.reduce((m, row) => Math.max(m, row.serviceFeeTotal), 0);
     return Math.max(20_000, Math.ceil(max * 1.12));
   }, [chartRows]);
 
@@ -348,10 +392,10 @@ export function ClientCollectionChartCard({
         styles={{ body: { padding: '18px 18px 18px' } }}
       >
         <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
-          Invoice Collection
+          Account Overview
         </Title>
         <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 13, lineHeight: 1.5 }}>
-          Paid and unpaid amounts by project. Click a bar to view sub-projects.
+          Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
         </Text>
         <Text type="secondary" style={{ fontSize: 13 }}>
           No clients match the current sales and client filters in this view.
@@ -378,11 +422,11 @@ export function ClientCollectionChartCard({
       >
         <div>
           <Title level={5} style={{ marginTop: 0, marginBottom: drillGroup ? 0 : 4 }}>
-            {drillGroup ? `${drillGroup.label} · projects` : 'Invoice Collection'}
+            {drillGroup ? `${drillGroup.label} · projects` : 'Account Overview'}
           </Title>
           {!drillGroup ? (
             <Text type="secondary" style={{ display: 'block', fontSize: 13, lineHeight: 1.5 }}>
-              Paid and unpaid amounts by project. Click a bar to view sub-projects.
+              Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
             </Text>
           ) : null}
         </div>
@@ -390,11 +434,10 @@ export function ClientCollectionChartCard({
           <Button
             type="default"
             icon={<ArrowLeftOutlined />}
+            aria-label="Back to all clients"
             onClick={() => setClickedDrillKey(null)}
             style={{ borderRadius: 8, flexShrink: 0 }}
-          >
-            Back to all clients
-          </Button>
+          />
         ) : null}
       </div>
 
@@ -405,6 +448,7 @@ export function ClientCollectionChartCard({
             data={chartRows}
             margin={{ top: 8, right: 12, left: 0, bottom: activeDrillKey ? 4 : 8 }}
             barCategoryGap={activeDrillKey ? '12%' : '18%'}
+            maxBarSize={60}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis
@@ -424,13 +468,23 @@ export function ClientCollectionChartCard({
               axisLine={{ stroke: '#e8e8e8' }}
             />
             <RTooltip content={<CollectionTooltip />} cursor={{ fill: 'rgba(70, 155, 255, 0.06)' }} />
-            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} itemGap={12} />
+            <Bar
+              dataKey="equity"
+              name="Equity"
+              stackId="fee"
+              fill={FEE_EQUITY}
+              cursor={activeDrillKey ? 'default' : 'pointer'}
+              onClick={(entry) => {
+                if (activeDrillKey || !entry?.payload) return;
+                handleBarAreaClick(entry.payload as CollectionBarRow);
+              }}
+            />
             <Bar
               dataKey="paid"
-              name="Paid"
-              stackId="collection"
-              fill={COLLECTION_PAID}
-              radius={[0, 0, 0, 0]}
+              name="Cash Paid"
+              stackId="fee"
+              fill={FEE_PAID}
               cursor={activeDrillKey ? 'default' : 'pointer'}
               onClick={(entry) => {
                 if (activeDrillKey || !entry?.payload) return;
@@ -439,9 +493,9 @@ export function ClientCollectionChartCard({
             />
             <Bar
               dataKey="unpaid"
-              name="Unpaid balance"
-              stackId="collection"
-              fill={COLLECTION_UNPAID}
+              name="Cash Unpaid"
+              stackId="fee"
+              fill={FEE_UNPAID}
               radius={[4, 4, 0, 0]}
               cursor={activeDrillKey ? 'default' : 'pointer'}
               onClick={(entry) => {
