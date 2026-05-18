@@ -1441,6 +1441,7 @@ export default function SalesRevenueAnalyticsPage() {
           filterScopeKey={filterScopeKey}
           periodCount={view.periods.length}
           selectedSalesKeys={selectedSalesKeys}
+          selectedClientIds={selectedClientIds}
         />
 
         <Card

@@ -21,6 +21,13 @@ const DEMO_PERIOD_COUNT = 5;
 
 type RepKey = 'alice' | 'bob' | 'carol' | 'david';
 
+/** Matches toolbar client filter ids on the analytics page. */
+export type AnalyticsClientId = 'acme' | 'globex' | 'initech' | 'umbrella';
+
+export type CollectionChartClientFilter = AnalyticsClientId[];
+
+const ANALYTICS_CLIENT_IDS: AnalyticsClientId[] = ['acme', 'globex', 'initech', 'umbrella'];
+
 type CollectionProjectDef = {
   key: string;
   name: string;
@@ -31,6 +38,8 @@ type CollectionClientGroup = {
   key: string;
   label: string;
   owner: RepKey;
+  /** Toolbar client filter id; omitted for demo-only clients (e.g. Edge). */
+  filterClientId?: AnalyticsClientId;
   paid: number;
   unpaid: number;
   projects: CollectionProjectDef[];
@@ -41,6 +50,7 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'apex',
     label: 'Client Apex',
     owner: 'alice',
+    filterClientId: 'acme',
     paid: 132_000,
     unpaid: 26_000,
     projects: [
@@ -55,6 +65,7 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'bolt',
     label: 'Client Bolt',
     owner: 'bob',
+    filterClientId: 'globex',
     paid: 84_000,
     unpaid: 8_000,
     projects: [
@@ -68,6 +79,7 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'core',
     label: 'Client Core',
     owner: 'carol',
+    filterClientId: 'initech',
     paid: 112_000,
     unpaid: 23_000,
     projects: [
@@ -82,6 +94,7 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
     key: 'dusk',
     label: 'Client Dusk',
     owner: 'david',
+    filterClientId: 'umbrella',
     paid: 68_000,
     unpaid: 12_000,
     projects: [
@@ -108,7 +121,10 @@ const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
 ];
 
 export type CollectionChartSalesFilter = RepKey[];
-export type CollectionChartClientFilter = string[];
+
+function isAllClientsSelected(clientIds: CollectionChartClientFilter) {
+  return clientIds.length === 0 || clientIds.length === ANALYTICS_CLIENT_IDS.length;
+}
 
 type CollectionBarRow = {
   key: string;
@@ -157,14 +173,27 @@ function isAllSalesSelected(salesKeys: CollectionChartSalesFilter) {
   return salesKeys.length === 0 || salesKeys.length === 4;
 }
 
+function matchesClientFilter(group: CollectionClientGroup, clientIds: CollectionChartClientFilter) {
+  if (isAllClientsSelected(clientIds)) return true;
+  if (!group.filterClientId) return false;
+  return clientIds.includes(group.filterClientId);
+}
+
+function collectionGroupForClient(clientId: AnalyticsClientId) {
+  return COLLECTION_CLIENT_GROUPS.find((g) => g.filterClientId === clientId) ?? null;
+}
+
 function buildClientRows(
   periodCount: number,
   salesKeys: CollectionChartSalesFilter,
+  clientIds: CollectionChartClientFilter,
 ): CollectionBarRow[] {
   const salesSet = new Set(salesKeys);
   const allSales = isAllSalesSelected(salesKeys);
 
-  return COLLECTION_CLIENT_GROUPS.filter((g) => allSales || salesSet.has(g.owner))
+  return COLLECTION_CLIENT_GROUPS.filter(
+    (g) => (allSales || salesSet.has(g.owner)) && matchesClientFilter(g, clientIds),
+  )
     .map((group) => {
       const paid = scaleForPeriod(group.paid, periodCount);
       const unpaid = scaleForPeriod(group.unpaid, periodCount);
@@ -262,43 +291,53 @@ type ClientCollectionChartCardProps = {
   filterScopeKey: string;
   periodCount: number;
   selectedSalesKeys: CollectionChartSalesFilter;
+  selectedClientIds: CollectionChartClientFilter;
 };
 
 export function ClientCollectionChartCard({
   filterScopeKey,
   periodCount,
   selectedSalesKeys,
+  selectedClientIds,
 }: ClientCollectionChartCardProps) {
-  const [drillClientKey, setDrillClientKey] = useState<string | null>(null);
+  const [clickedDrillKey, setClickedDrillKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setDrillClientKey(null);
+    setClickedDrillKey(null);
   }, [filterScopeKey]);
 
+  const filterDrillKey = useMemo(() => {
+    if (isAllClientsSelected(selectedClientIds) || selectedClientIds.length !== 1) return null;
+    return collectionGroupForClient(selectedClientIds[0])?.key ?? null;
+  }, [selectedClientIds]);
+
+  const activeDrillKey = clickedDrillKey ?? filterDrillKey;
+  const drillFromFilter = filterDrillKey != null && clickedDrillKey == null;
+
   const clientRows = useMemo(
-    () => buildClientRows(periodCount, selectedSalesKeys),
-    [periodCount, selectedSalesKeys, filterScopeKey],
+    () => buildClientRows(periodCount, selectedSalesKeys, selectedClientIds),
+    [periodCount, selectedClientIds, selectedSalesKeys, filterScopeKey],
   );
 
   const drillGroup = useMemo(
-    () => COLLECTION_CLIENT_GROUPS.find((g) => g.key === drillClientKey) ?? null,
-    [drillClientKey],
+    () => COLLECTION_CLIENT_GROUPS.find((g) => g.key === activeDrillKey) ?? null,
+    [activeDrillKey],
   );
 
   const projectRows = useMemo(
-    () => (drillClientKey ? buildProjectRows(drillClientKey, periodCount) : []),
-    [drillClientKey, periodCount, filterScopeKey],
+    () => (activeDrillKey ? buildProjectRows(activeDrillKey, periodCount) : []),
+    [activeDrillKey, periodCount, filterScopeKey],
   );
 
-  const chartRows = drillClientKey ? projectRows : clientRows;
+  const chartRows = activeDrillKey ? projectRows : clientRows;
   const chartMax = useMemo(() => {
     const max = chartRows.reduce((m, row) => Math.max(m, row.invoiced), 0);
     return Math.max(20_000, Math.ceil(max * 1.12));
   }, [chartRows]);
 
   const handleBarAreaClick = (row: CollectionBarRow) => {
-    if (drillClientKey) return;
-    setDrillClientKey(row.key);
+    if (activeDrillKey) return;
+    setClickedDrillKey(row.key);
   };
 
   if (chartRows.length === 0) {
@@ -315,7 +354,7 @@ export function ClientCollectionChartCard({
           Paid and unpaid amounts by project. Click a bar to view sub-projects.
         </Text>
         <Text type="secondary" style={{ fontSize: 13 }}>
-          No clients match the current sales filter in this view.
+          No clients match the current sales and client filters in this view.
         </Text>
       </Card>
     );
@@ -347,11 +386,11 @@ export function ClientCollectionChartCard({
             </Text>
           ) : null}
         </div>
-        {drillGroup ? (
+        {drillGroup && !drillFromFilter ? (
           <Button
             type="default"
             icon={<ArrowLeftOutlined />}
-            onClick={() => setDrillClientKey(null)}
+            onClick={() => setClickedDrillKey(null)}
             style={{ borderRadius: 8, flexShrink: 0 }}
           >
             Back to all clients
@@ -362,20 +401,20 @@ export function ClientCollectionChartCard({
       <div style={{ width: '100%', height: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            key={`${filterScopeKey}-${drillClientKey ?? 'clients'}`}
+            key={`${filterScopeKey}-${activeDrillKey ?? 'clients'}`}
             data={chartRows}
-            margin={{ top: 8, right: 12, left: 0, bottom: drillClientKey ? 4 : 8 }}
-            barCategoryGap={drillClientKey ? '12%' : '18%'}
+            margin={{ top: 8, right: 12, left: 0, bottom: activeDrillKey ? 4 : 8 }}
+            barCategoryGap={activeDrillKey ? '12%' : '18%'}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: drillClientKey ? 11 : 12 }}
+              tick={{ fontSize: activeDrillKey ? 11 : 12 }}
               axisLine={{ stroke: '#e8e8e8' }}
               interval={0}
-              angle={drillClientKey ? -28 : 0}
-              textAnchor={drillClientKey ? 'end' : 'middle'}
-              height={drillClientKey ? 72 : 30}
+              angle={activeDrillKey ? -28 : 0}
+              textAnchor={activeDrillKey ? 'end' : 'middle'}
+              height={activeDrillKey ? 72 : 30}
             />
             <YAxis
               tickFormatter={(v) => axisMoneyShort(Number(v))}
@@ -392,9 +431,9 @@ export function ClientCollectionChartCard({
               stackId="collection"
               fill={COLLECTION_PAID}
               radius={[0, 0, 0, 0]}
-              cursor={drillClientKey ? 'default' : 'pointer'}
+              cursor={activeDrillKey ? 'default' : 'pointer'}
               onClick={(entry) => {
-                if (drillClientKey || !entry?.payload) return;
+                if (activeDrillKey || !entry?.payload) return;
                 handleBarAreaClick(entry.payload as CollectionBarRow);
               }}
             />
@@ -404,9 +443,9 @@ export function ClientCollectionChartCard({
               stackId="collection"
               fill={COLLECTION_UNPAID}
               radius={[4, 4, 0, 0]}
-              cursor={drillClientKey ? 'default' : 'pointer'}
+              cursor={activeDrillKey ? 'default' : 'pointer'}
               onClick={(entry) => {
-                if (drillClientKey || !entry?.payload) return;
+                if (activeDrillKey || !entry?.payload) return;
                 handleBarAreaClick(entry.payload as CollectionBarRow);
               }}
             />
