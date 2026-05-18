@@ -382,7 +382,7 @@ type AnalyticsExportInput = {
 
 function buildAnalyticsExportRows(input: AnalyticsExportInput) {
   const rows: string[][] = [
-    ['Sales Revenue Analytics Export'],
+    ['Revenue Analytics Export'],
     ['Exported at', input.exportedAt],
     ['Date range', input.rangeLabel],
     ['Month range', input.monthRangeLabel],
@@ -1169,7 +1169,7 @@ export default function SalesRevenueAnalyticsPage() {
                   Billing Dashboard
                 </Link>
                 <Text style={{ color: '#1f1f1f' }}>-</Text>
-                <Text style={{ color: '#1f1f1f', fontWeight: 500 }}>Sales Revenue Analytics</Text>
+                <Text style={{ color: '#1f1f1f', fontWeight: 500 }}>Revenue Analytics</Text>
               </Space>
             </Space>
           </Col>
