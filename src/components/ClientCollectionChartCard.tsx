@@ -250,6 +250,7 @@ const chartTooltipShellStyle: CSSProperties = {
   padding: '12px 14px',
   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
   minWidth: 220,
+  pointerEvents: 'auto',
 };
 
 const chartTooltipDividerStyle: CSSProperties = {
@@ -261,14 +262,21 @@ const chartTooltipDividerStyle: CSSProperties = {
 function CollectionTooltip({
   active,
   payload,
+  canDrillToProjects,
+  onProjectDetails,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ payload?: CollectionBarRow }>;
+  canDrillToProjects?: boolean;
+  onProjectDetails?: (row: CollectionBarRow) => void;
 }) {
   if (!active || !payload?.length) return null;
 
   const row = payload[0]?.payload;
   if (!row) return null;
+
+  const isClientBar = COLLECTION_CLIENT_GROUPS.some((g) => g.key === row.key);
+  const showProjectDetails = Boolean(canDrillToProjects && isClientBar && onProjectDetails);
 
   return (
     <div style={chartTooltipShellStyle}>
@@ -292,6 +300,23 @@ function CollectionTooltip({
       </div>
       <div style={chartTooltipDividerStyle} />
       <TooltipRow label="Service Fee Total" value={money(row.serviceFeeTotal)} strong />
+      {showProjectDetails ? (
+        <>
+          <div style={{ ...chartTooltipDividerStyle, marginTop: 12 }} />
+          <Button
+            type="default"
+            block
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onProjectDetails?.(row);
+            }}
+            style={{ borderRadius: 6, fontSize: 13 }}
+          >
+            Project Details
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -410,34 +435,25 @@ export function ClientCollectionChartCard({
       style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
       styles={{ body: { padding: '18px 18px 18px' } }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <Title level={5} style={{ marginTop: 0, marginBottom: drillGroup ? 0 : 4 }}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          {drillGroup && !drillFromFilter ? (
+            <Button
+              type="default"
+              icon={<ArrowLeftOutlined />}
+              aria-label="Back to all clients"
+              onClick={() => setClickedDrillKey(null)}
+              style={{ borderRadius: 8, flexShrink: 0 }}
+            />
+          ) : null}
+          <Title level={5} style={{ margin: 0 }}>
             {drillGroup ? `${drillGroup.label} · projects` : 'Account Overview'}
           </Title>
-          {!drillGroup ? (
-            <Text type="secondary" style={{ display: 'block', fontSize: 13, lineHeight: 1.5 }}>
-              Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
-            </Text>
-          ) : null}
         </div>
-        {drillGroup && !drillFromFilter ? (
-          <Button
-            type="default"
-            icon={<ArrowLeftOutlined />}
-            aria-label="Back to all clients"
-            onClick={() => setClickedDrillKey(null)}
-            style={{ borderRadius: 8, flexShrink: 0 }}
-          />
+        {!drillGroup ? (
+          <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
+            Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
+          </Text>
         ) : null}
       </div>
 
@@ -467,7 +483,16 @@ export function ClientCollectionChartCard({
               width={56}
               axisLine={{ stroke: '#e8e8e8' }}
             />
-            <RTooltip content={<CollectionTooltip />} cursor={{ fill: 'rgba(70, 155, 255, 0.06)' }} />
+            <RTooltip
+              content={(tooltipProps) => (
+                <CollectionTooltip
+                  {...tooltipProps}
+                  canDrillToProjects={!activeDrillKey}
+                  onProjectDetails={handleBarAreaClick}
+                />
+              )}
+              cursor={{ fill: 'rgba(70, 155, 255, 0.06)' }}
+            />
             <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
             <Bar
               dataKey="equity"
