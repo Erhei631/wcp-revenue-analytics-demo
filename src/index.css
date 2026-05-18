@@ -286,6 +286,45 @@ svg {
   }
 }
 
+/* Sales revenue analytics — revenue by segmented toggle */
+.analytics-revenue-by-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #469bff;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.analytics-revenue-by-toggle__btn {
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 8px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: inherit;
+  cursor: pointer;
+  background: #fff;
+  color: #469bff;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.analytics-revenue-by-toggle__btn + .analytics-revenue-by-toggle__btn {
+  border-left: 1px solid #469bff;
+}
+
+.analytics-revenue-by-toggle__btn--active {
+  background: #469bff;
+  color: #fff;
+}
+
+.analytics-revenue-by-toggle__btn:focus-visible {
+  outline: 2px solid rgba(70, 155, 255, 0.45);
+  outline-offset: -2px;
+}
+
 /* Sales revenue analytics — revenue breakdown table */
 .analytics-revenue-table .ant-table-thead > tr > th {
   background: #dfe5ee !important;

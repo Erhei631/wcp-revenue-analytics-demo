@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="924" height="340" viewBox="0 0 924 340" fill="none">
+  <defs>
+    <pattern id="grid" width="171.2" height="52" patternUnits="userSpaceOnUse" x="56" y="16">
+      <path d="M 171.2 0 L 0 0 0 52" stroke="#f0f0f0" stroke-width="1" stroke-dasharray="3 3"/>
+    </pattern>
+  </defs>
+  <rect x="56" y="16" width="856" height="260" fill="url(#grid)"/>
+  <!-- Y axis -->
+  <line x1="56" y1="16" x2="56" y2="276" stroke="#e8e8e8" stroke-width="1"/>
+  <!-- X axis -->
+  <line x1="56" y1="276" x2="912" y2="276" stroke="#e8e8e8" stroke-width="1"/>
+  <!-- Y labels -->
+  <text x="48" y="280" text-anchor="end" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">$0</text>
+  <text x="48" y="215" text-anchor="end" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">$3k</text>
+  <text x="48" y="150" text-anchor="end" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">$7k</text>
+  <text x="48" y="85" text-anchor="end" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">$10k</text>
+  <text x="48" y="20" text-anchor="end" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">$14k</text>
+  <!-- X labels -->
+  <text x="56" y="296" text-anchor="middle" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Jan 26</text>
+  <text x="270" y="296" text-anchor="middle" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Feb 26</text>
+  <text x="484" y="296" text-anchor="middle" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Mar 26</text>
+  <text x="698" y="296" text-anchor="middle" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Apr 26</text>
+  <text x="912" y="296" text-anchor="middle" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">May 26</text>
+  <!-- Acme #8371F3 -->
+  <polyline points="56,139.5 270,104.2 484,149.1 698,70.2 912,40.2" fill="none" stroke="#8371F3" stroke-width="2"/>
+  <circle cx="56" cy="139.5" r="4" fill="#fff" stroke="#8371F3" stroke-width="2"/>
+  <circle cx="270" cy="104.2" r="4" fill="#fff" stroke="#8371F3" stroke-width="2"/>
+  <circle cx="484" cy="149.1" r="4" fill="#fff" stroke="#8371F3" stroke-width="2"/>
+  <circle cx="698" cy="70.2" r="4" fill="#fff" stroke="#8371F3" stroke-width="2"/>
+  <circle cx="912" cy="40.2" r="4" fill="#fff" stroke="#8371F3" stroke-width="2"/>
+  <!-- Globex #40C585 -->
+  <polyline points="56,176.8 270,168.5 484,136.4 698,154.2 912,114.2" fill="none" stroke="#40C585" stroke-width="2"/>
+  <circle cx="56" cy="176.8" r="4" fill="#fff" stroke="#40C585" stroke-width="2"/>
+  <circle cx="270" cy="168.5" r="4" fill="#fff" stroke="#40C585" stroke-width="2"/>
+  <circle cx="484" cy="136.4" r="4" fill="#fff" stroke="#40C585" stroke-width="2"/>
+  <circle cx="698" cy="154.2" r="4" fill="#fff" stroke="#40C585" stroke-width="2"/>
+  <circle cx="912" cy="114.2" r="4" fill="#fff" stroke="#40C585" stroke-width="2"/>
+  <!-- Initech #EDAB00 -->
+  <polyline points="56,222.3 270,204.5 484,200.4 698,182.8 912,208.8" fill="none" stroke="#EDAB00" stroke-width="2"/>
+  <circle cx="56" cy="222.3" r="4" fill="#fff" stroke="#EDAB00" stroke-width="2"/>
+  <circle cx="270" cy="204.5" r="4" fill="#fff" stroke="#EDAB00" stroke-width="2"/>
+  <circle cx="484" cy="200.4" r="4" fill="#fff" stroke="#EDAB00" stroke-width="2"/>
+  <circle cx="698" cy="182.8" r="4" fill="#fff" stroke="#EDAB00" stroke-width="2"/>
+  <circle cx="912" cy="208.8" r="4" fill="#fff" stroke="#EDAB00" stroke-width="2"/>
+  <!-- Umbrella #469BFF -->
+  <polyline points="56,244.2 270,235.1 484,218.4 698,231.4 912,204.4" fill="none" stroke="#469BFF" stroke-width="2"/>
+  <circle cx="56" cy="244.2" r="4" fill="#fff" stroke="#469BFF" stroke-width="2"/>
+  <circle cx="270" cy="235.1" r="4" fill="#fff" stroke="#469BFF" stroke-width="2"/>
+  <circle cx="484" cy="218.4" r="4" fill="#fff" stroke="#469BFF" stroke-width="2"/>
+  <circle cx="698" cy="231.4" r="4" fill="#fff" stroke="#469BFF" stroke-width="2"/>
+  <circle cx="912" cy="204.4" r="4" fill="#fff" stroke="#469BFF" stroke-width="2"/>
+  <!-- Legend -->
+  <circle cx="200" cy="322" r="4" fill="#8371F3"/>
+  <text x="212" y="326" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Acme Corp · ERP rollout</text>
+  <circle cx="420" cy="322" r="4" fill="#40C585"/>
+  <text x="432" y="326" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Globex · Data platform</text>
+  <circle cx="620" cy="322" r="4" fill="#EDAB00"/>
+  <text x="632" y="326" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Initech · Billing integration</text>
+  <circle cx="820" cy="322" r="4" fill="#469BFF"/>
+  <text x="832" y="326" fill="#595959" font-family="Inter, system-ui, sans-serif" font-size="12">Umbrella · Mobile app</text>
+</svg>

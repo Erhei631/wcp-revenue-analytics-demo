@@ -42,6 +42,7 @@ import {
   type QuickPresetKey,
 } from '../components/MonthRangePicker';
 import { AnalyticsStatBar, type AnalyticsStatItem } from '../components/AnalyticsStatBar';
+import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import {
   CHART_BROWN,
   CHART_BROWN_SOFT,
@@ -144,15 +145,25 @@ type BuiltView = {
   note?: string;
 };
 
-function monthInRange(month: Dayjs, range: MonthRangeValue) {
-  const key = month.year() * 12 + month.month();
-  const startKey = range.start.year() * 12 + range.start.month();
-  const endKey = range.end.year() * 12 + range.end.month();
-  return key >= startKey && key <= endKey;
+function normalizeMonthRange(range: MonthRangeValue): MonthRangeValue {
+  const start = range.start.startOf('month');
+  const end = range.end.startOf('month');
+  return start.isAfter(end) ? { start: end, end: start } : { start, end };
 }
 
-function monthlySystemFromRep(byRep: Record<RepKey, readonly number[]>): number[] {
-  return PERIODS.map((_, i) => REP_KEYS.reduce((s, k) => s + byRep[k][i], 0));
+function monthRangeFromKeys(startKey: string, endKey: string): MonthRangeValue {
+  return normalizeMonthRange({
+    start: dayjs(`${startKey}-01`),
+    end: dayjs(`${endKey}-01`),
+  });
+}
+
+function monthInRange(month: Dayjs, range: MonthRangeValue) {
+  const normalized = normalizeMonthRange(range);
+  const key = month.year() * 12 + month.month();
+  const startKey = normalized.start.year() * 12 + normalized.start.month();
+  const endKey = normalized.end.year() * 12 + normalized.end.month();
+  return key >= startKey && key <= endKey;
 }
 
 function buildClientRepMonthlyExclusive(): Record<ClientId, Record<RepKey, number[]>> {
@@ -242,35 +253,71 @@ function formatClientFilterLabel(clientIds: ClientFilter): string {
   return names.join(', ');
 }
 
-function sumRepsSeries(byRep: Record<RepKey, number[]>, keys: RepKey[]): number[] {
-  const length = byRep[REP_KEYS[0]]?.length ?? 0;
-  return Array.from({ length }, (_, i) => keys.reduce((sum, key) => sum + (byRep[key][i] ?? 0), 0));
+function applySalesScope(
+  salesKeys: SalesFilter,
+  byRep: Record<RepKey, number[]>,
+  byClient: Record<ClientId, number[]>,
+): { byRep: Record<RepKey, number[]>; byClient: Record<ClientId, number[]>; system: number[] } {
+  const periodCount = byRep[REP_KEYS[0]]?.length ?? 0;
+  if (isAllSalesSelected(salesKeys)) {
+    return {
+      byRep,
+      byClient,
+      system: Array.from({ length: periodCount }, (_, i) =>
+        REP_KEYS.reduce((sum, key) => sum + (byRep[key][i] ?? 0), 0),
+      ),
+    };
+  }
+
+  const keys = new Set(salesKeys);
+  const scopedByRep = Object.fromEntries(
+    REP_KEYS.map((k) => [k, keys.has(k) ? byRep[k] : byRep[k].map(() => 0)]),
+  ) as Record<RepKey, number[]>;
+  const scopedByClient = Object.fromEntries(
+    CLIENT_IDS.map((id) => [
+      id,
+      keys.has(CLIENT_OWNER[id]) ? byClient[id] : byClient[id].map(() => 0),
+    ]),
+  ) as Record<ClientId, number[]>;
+  const system = Array.from({ length: periodCount }, (_, i) =>
+    salesKeys.reduce((sum, key) => sum + (scopedByRep[key][i] ?? 0), 0),
+  );
+
+  return { byRep: scopedByRep, byClient: scopedByClient, system };
 }
 
-/** Build analytics view from demo monthly rows, filtered to the selected month range. */
-function buildResolvedView(range: MonthRangeValue, clientIds: ClientFilter, rangeLabel: string): BuiltView {
+/** Build analytics view from demo monthly rows, filtered to toolbar month / client / sales scope. */
+function buildResolvedView(
+  range: MonthRangeValue,
+  clientIds: ClientFilter,
+  salesKeys: SalesFilter,
+  rangeLabel: string,
+): BuiltView {
   const monthly = monthlyByRepForClients(clientIds);
   const monthlyClients = monthlyByClientForClients(clientIds);
-  const m = monthlySystemFromRep(monthly);
   const baseNote = clientFilterNote(clientIds);
   const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
     .filter(({ month }) => monthInRange(month, range))
     .map(({ i }) => i);
 
   const periods = indices.map((i) => PERIODS[i]);
-  const system = indices.map((i) => m[i]);
   const byRep = Object.fromEntries(
     REP_KEYS.map((k) => [k, indices.map((i) => monthly[k][i])]),
   ) as Record<RepKey, number[]>;
   const byClient = Object.fromEntries(
     CLIENT_IDS.map((id) => [id, indices.map((i) => monthlyClients[id][i])]),
   ) as Record<ClientId, number[]>;
+  const { byRep: scopedByRep, byClient: scopedByClient, system } = applySalesScope(
+    salesKeys,
+    byRep,
+    byClient,
+  );
 
   return {
     periods,
     system,
-    byRep,
-    byClient,
+    byRep: scopedByRep,
+    byClient: scopedByClient,
     bucket: 'month',
     rangeLabel,
     note: baseNote,
@@ -765,12 +812,23 @@ export default function SalesRevenueAnalyticsPage() {
   const [selectedSalesKeys, setSelectedSalesKeys] = useState<SalesFilter>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<ClientFilter>([]);
   const [expandedRepKeys, setExpandedRepKeys] = useState<RepKey[]>([]);
+  const [revenueTrendView, setRevenueTrendView] = useState<'sales' | 'client'>('sales');
 
-  const rangeLabel = activePreset ? PRESET_LABELS[activePreset] : formatMonthRangeLabel(monthRange);
+  const normalizedMonthRange = useMemo(() => normalizeMonthRange(monthRange), [monthRange]);
+  const rangeLabel = activePreset ? PRESET_LABELS[activePreset] : formatMonthRangeLabel(normalizedMonthRange);
+  const monthStartKey = normalizedMonthRange.start.format('YYYY-MM');
+  const monthEndKey = normalizedMonthRange.end.format('YYYY-MM');
+  const filterScopeKey = `${monthStartKey}|${monthEndKey}|${selectedClientIds.join(',')}|${selectedSalesKeys.join(',')}`;
 
   const view = useMemo(
-    () => buildResolvedView(monthRange, selectedClientIds, rangeLabel),
-    [monthRange, rangeLabel, selectedClientIds],
+    () =>
+      buildResolvedView(
+        monthRangeFromKeys(monthStartKey, monthEndKey),
+        selectedClientIds,
+        selectedSalesKeys,
+        rangeLabel,
+      ),
+    [monthEndKey, monthStartKey, rangeLabel, selectedClientIds, selectedSalesKeys],
   );
 
   const isAllReps = isAllSalesSelected(selectedSalesKeys);
@@ -793,10 +851,7 @@ export default function SalesRevenueAnalyticsPage() {
     legendFormatter: clientLegendFormatter,
   } = useTrendLegendToggle(`${trendLegendResetKey}|client`);
 
-  const primarySeries = useMemo(
-    () => (isAllReps ? view.system : sumRepsSeries(view.byRep, activeSalesKeys)),
-    [activeSalesKeys, isAllReps, view.byRep, view.system],
-  );
+  const primarySeries = view.system;
 
   const totalTrendData = useMemo(
     () => view.periods.map((p, i) => ({ period: p, revenue: primarySeries[i] ?? 0 })),
@@ -812,7 +867,7 @@ export default function SalesRevenueAnalyticsPage() {
         carol: view.byRep.carol[i],
         david: view.byRep.david[i],
       })),
-    [view],
+    [filterScopeKey, view.byRep, view.periods],
   );
 
   const multiLineClientData = useMemo(
@@ -824,7 +879,7 @@ export default function SalesRevenueAnalyticsPage() {
         initech: view.byClient.initech[i],
         umbrella: view.byClient.umbrella[i],
       })),
-    [view],
+    [filterScopeKey, view.byClient, view.periods],
   );
 
   const tableRows: RevenueBreakdownRow[] = useMemo(
@@ -834,7 +889,7 @@ export default function SalesRevenueAnalyticsPage() {
         const total = values.reduce((a, b) => a + b, 0);
         return { key: r.key, name: r.name, color: r.color, values, total };
       }),
-    [view],
+    [filterScopeKey, view.byRep],
   );
 
   const filteredTableRows = useMemo(() => {
@@ -845,7 +900,7 @@ export default function SalesRevenueAnalyticsPage() {
 
   useEffect(() => {
     setExpandedRepKeys([]);
-  }, [monthRange, selectedClientIds, selectedSalesKeys]);
+  }, [filterScopeKey]);
 
   const toggleRepExpanded = useCallback((repKey: RepKey) => {
     setExpandedRepKeys((prev) =>
@@ -947,18 +1002,18 @@ export default function SalesRevenueAnalyticsPage() {
         },
       },
     ],
-    [expandedRepKeys, selectedClientIds, toggleRepExpanded, view.periods],
+    [expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
   );
 
-  const totalChartMax = useMemo(() => {
-    if (isAllReps) return maxChartValue(view.system, view.byRep);
-    return maxSeries(primarySeries);
-  }, [isAllReps, primarySeries, view.byRep, view.system]);
+  const totalChartMax = useMemo(
+    () => (isAllReps ? maxChartValue(view.system, view.byRep) : maxSeries(primarySeries)),
+    [isAllReps, primarySeries, view.byRep, view.system],
+  );
 
-  const multiChartMax = useMemo(() => {
-    if (isAllReps) return maxChartValue(view.system, view.byRep);
-    return maxSeries(primarySeries);
-  }, [isAllReps, primarySeries, view.byRep, view.system]);
+  const multiChartMax = useMemo(
+    () => (isAllReps ? maxChartValue(view.system, view.byRep) : maxSeries(primarySeries)),
+    [isAllReps, primarySeries, view.byRep, view.system],
+  );
 
   const clientMultiChartMax = useMemo(() => maxClientChartValue(view.byClient), [view.byClient]);
 
@@ -1047,6 +1102,7 @@ export default function SalesRevenueAnalyticsPage() {
         title: 'Latest Period',
         value: `$${latestValue.toLocaleString('en-US')}`,
         valueVariant: 'metric',
+        note: 'Last month in range',
         rightLabel: latestLabel,
       },
       {
@@ -1166,7 +1222,7 @@ export default function SalesRevenueAnalyticsPage() {
               activePreset={activePreset}
               referenceDate={REPORTING_END}
               onChange={(next, preset) => {
-                setMonthRange(next);
+                setMonthRange(normalizeMonthRange(next));
                 setActivePreset(preset ?? null);
               }}
             />
@@ -1177,7 +1233,7 @@ export default function SalesRevenueAnalyticsPage() {
               value={selectedClientIds}
               onChange={(values) => setSelectedClientIds(values as ClientFilter)}
               options={clientSelectOptions}
-              placeholder="All Client & Projects"
+              placeholder="All Client"
               maxTagCount={1}
               maxTagPlaceholder={(omitted) => `+${omitted.length}`}
               suffixIcon={pillSuffix}
@@ -1221,7 +1277,7 @@ export default function SalesRevenueAnalyticsPage() {
             </Text>
           )}
           <div style={{ width: '100%', height: 320 }}>
-            <ResponsiveContainer>
+            <ResponsiveContainer key={`total-${filterScopeKey}`}>
               <AreaChart data={totalTrendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id={`revFill-${chartFillKey}`} x1="0" y1="0" x2="0" y2="1">
@@ -1269,131 +1325,142 @@ export default function SalesRevenueAnalyticsPage() {
           style={{ borderRadius: 8, marginBottom: 16, borderColor: '#f0f0f0' }}
           styles={{ body: { padding: '18px 18px 8px' } }}
         >
-          <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-            Individual Sales Trend
+          <Title level={5} style={{ marginTop: 0, marginBottom: 12, fontWeight: 600, color: '#1f1f1f' }}>
+            Revenue by
           </Title>
-          {isAllReps ? (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {clientScopeLabel
-                ? `Revenue per sales rep for ${clientScopeLabel} ($) — click legend to show or hide lines`
-                : 'Revenue per sales rep ($) — click legend to show or hide lines'}
-            </Text>
-          ) : (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {`Showing ${isSingleRep ? selectedRepMeta?.name : formatSalesFilterLabel(selectedSalesKeys)}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} only — click legend to show or hide lines`}
-            </Text>
-          )}
+          <div className="analytics-revenue-by-toggle" role="tablist" aria-label="Revenue by view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={revenueTrendView === 'sales'}
+              className={
+                revenueTrendView === 'sales'
+                  ? 'analytics-revenue-by-toggle__btn analytics-revenue-by-toggle__btn--active'
+                  : 'analytics-revenue-by-toggle__btn'
+              }
+              onClick={() => setRevenueTrendView('sales')}
+            >
+              By sales rep
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={revenueTrendView === 'client'}
+              className={
+                revenueTrendView === 'client'
+                  ? 'analytics-revenue-by-toggle__btn analytics-revenue-by-toggle__btn--active'
+                  : 'analytics-revenue-by-toggle__btn'
+              }
+              onClick={() => setRevenueTrendView('client')}
+            >
+              By client
+            </button>
+          </div>
           <div style={{ width: '100%', height: 340 }}>
-            <ResponsiveContainer>
-              <LineChart data={multiLineData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
-                <YAxis
-                  tickFormatter={(v) => axisMoneyShort(Number(v))}
-                  domain={[0, Math.max(500, Math.ceil(multiChartMax * 1.12))]}
-                  tick={{ fontSize: 12 }}
-                  width={56}
-                  axisLine={{ stroke: '#e8e8e8' }}
-                />
-                <RTooltip
-                  content={({ active, payload, label }) => (
-                    <IndividualSalesTrendTooltip active={active} payload={payload} label={label} />
-                  )}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
-                  onClick={onSalesLegendClick}
-                  formatter={salesLegendFormatter}
-                />
-                {REP_DEFS.map((r) => {
-                  if (!activeSalesKeys.includes(r.key)) return null;
-                  const repTotal = view.byRep[r.key].reduce((a, b) => a + b, 0);
-                  if (!isAllClientsSelected(selectedClientIds) && repTotal === 0) return null;
-                  const hidden = hiddenSalesTrendKeys.has(r.key);
-                  return (
-                    <Line
-                      key={r.key}
-                      type="monotone"
-                      dataKey={r.key}
-                      name={r.name}
-                      stroke={r.color}
-                      strokeWidth={2}
-                      strokeOpacity={hidden ? 0.2 : 1}
-                      hide={hidden}
-                      dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: r.color }}
-                      connectNulls
-                    />
-                  );
-                })}
-              </LineChart>
-            </ResponsiveContainer>
+            {revenueTrendView === 'sales' ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  key={`sales-${filterScopeKey}`}
+                  data={multiLineData}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
+                  <YAxis
+                    tickFormatter={(v) => axisMoneyShort(Number(v))}
+                    domain={[0, Math.max(500, Math.ceil(multiChartMax * 1.12))]}
+                    tick={{ fontSize: 12 }}
+                    width={56}
+                    axisLine={{ stroke: '#e8e8e8' }}
+                  />
+                  <RTooltip
+                    content={({ active, payload, label }) => (
+                      <IndividualSalesTrendTooltip active={active} payload={payload} label={label} />
+                    )}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+                    onClick={onSalesLegendClick}
+                    formatter={salesLegendFormatter}
+                  />
+                  {REP_DEFS.map((r) => {
+                    if (!activeSalesKeys.includes(r.key)) return null;
+                    const repTotal = view.byRep[r.key].reduce((a, b) => a + b, 0);
+                    if (!isAllClientsSelected(selectedClientIds) && repTotal === 0) return null;
+                    const hidden = hiddenSalesTrendKeys.has(r.key);
+                    return (
+                      <Line
+                        key={r.key}
+                        type="monotone"
+                        dataKey={r.key}
+                        name={r.name}
+                        stroke={r.color}
+                        strokeWidth={2}
+                        strokeOpacity={hidden ? 0.2 : 1}
+                        hide={hidden}
+                        dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: r.color }}
+                        connectNulls
+                      />
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  key={`client-${filterScopeKey}`}
+                  data={multiLineClientData}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
+                  <YAxis
+                    tickFormatter={(v) => axisMoneyShort(Number(v))}
+                    domain={[0, Math.max(500, Math.ceil(clientMultiChartMax * 1.12))]}
+                    tick={{ fontSize: 12 }}
+                    width={56}
+                    axisLine={{ stroke: '#e8e8e8' }}
+                  />
+                  <RTooltip
+                    content={({ active, payload, label }) => (
+                      <IndividualClientTrendTooltip active={active} payload={payload} label={label} />
+                    )}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+                    onClick={onClientLegendClick}
+                    formatter={clientLegendFormatter}
+                  />
+                  {visibleClientTrendDefs.map((c) => {
+                    const clientTotal = view.byClient[c.key].reduce((a, b) => a + b, 0);
+                    if (clientTotal === 0) return null;
+                    const hidden = hiddenClientTrendKeys.has(c.key);
+                    return (
+                      <Line
+                        key={c.key}
+                        type="monotone"
+                        dataKey={c.key}
+                        name={c.name}
+                        stroke={c.color}
+                        strokeWidth={2}
+                        strokeOpacity={hidden ? 0.2 : 1}
+                        hide={hidden}
+                        dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: c.color }}
+                        connectNulls
+                      />
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 
-        <Card
-          bordered
-          style={{ borderRadius: 8, marginBottom: 16, borderColor: '#f0f0f0' }}
-          styles={{ body: { padding: '18px 18px 8px' } }}
-        >
-          <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-            Individual Client Trend
-          </Title>
-          {isAllClients ? (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {isAllReps
-                ? 'Revenue per client / project ($) — click legend to show or hide lines'
-                : `Revenue per client for ${formatSalesFilterLabel(selectedSalesKeys)} ($) — click legend to show or hide lines`}
-            </Text>
-          ) : (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {`Showing ${isSingleClient ? selectedClientMeta?.name : formatClientFilterLabel(selectedClientIds)}${!isAllReps ? ` · ${formatSalesFilterLabel(selectedSalesKeys)}` : ''} only — click legend to show or hide lines`}
-            </Text>
-          )}
-          <div style={{ width: '100%', height: 340 }}>
-            <ResponsiveContainer>
-              <LineChart data={multiLineClientData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
-                <YAxis
-                  tickFormatter={(v) => axisMoneyShort(Number(v))}
-                  domain={[0, Math.max(500, Math.ceil(clientMultiChartMax * 1.12))]}
-                  tick={{ fontSize: 12 }}
-                  width={56}
-                  axisLine={{ stroke: '#e8e8e8' }}
-                />
-                <RTooltip
-                  content={({ active, payload, label }) => (
-                    <IndividualClientTrendTooltip active={active} payload={payload} label={label} />
-                  )}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
-                  onClick={onClientLegendClick}
-                  formatter={clientLegendFormatter}
-                />
-                {visibleClientTrendDefs.map((c) => {
-                  const clientTotal = view.byClient[c.key].reduce((a, b) => a + b, 0);
-                  if (clientTotal === 0) return null;
-                  const hidden = hiddenClientTrendKeys.has(c.key);
-                  return (
-                    <Line
-                      key={c.key}
-                      type="monotone"
-                      dataKey={c.key}
-                      name={c.name}
-                      stroke={c.color}
-                      strokeWidth={2}
-                      strokeOpacity={hidden ? 0.2 : 1}
-                      hide={hidden}
-                      dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: c.color }}
-                      connectNulls
-                    />
-                  );
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        <ClientCollectionChartCard
+          filterScopeKey={filterScopeKey}
+          periodCount={view.periods.length}
+          selectedSalesKeys={selectedSalesKeys}
+        />
 
         <Card
           bordered
@@ -1408,10 +1475,8 @@ export default function SalesRevenueAnalyticsPage() {
               </Text>
             ) : null}
           </Title>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-            Click the arrow beside a sales rep to expand revenue by client / project.
-          </Text>
           <Table<DisplayRow>
+            key={filterScopeKey}
             className="analytics-revenue-table"
             rowKey="key"
             columns={columns}
