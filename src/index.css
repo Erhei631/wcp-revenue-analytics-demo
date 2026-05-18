@@ -295,16 +295,34 @@ svg {
   padding-left: 12px;
 }
 
-.revenue-breakdown-tooltip .ant-tooltip-inner {
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-  color: inherit !important;
+.analytics-revenue-table .analytics-revenue-client-row > td {
+  background: #fafafa;
 }
 
-.revenue-breakdown-tooltip .ant-tooltip-arrow::before {
-  background: #fff !important;
+.analytics-revenue-expand-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8c8c8c;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.analytics-revenue-expand-btn:hover {
+  color: #262626;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.analytics-revenue-expand-spacer {
+  display: inline-block;
+  width: 18px;
+  flex-shrink: 0;
 }
 
 /* Billing dashboard — Revenue Analytics toolbar button */
