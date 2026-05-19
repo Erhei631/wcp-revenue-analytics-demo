@@ -10,7 +10,7 @@ export type AnalyticsStatItem = {
   key: string;
   title: string;
   value: ReactNode;
-  /** Hovering the stat section shows a Paid / Unpaid breakdown tooltip. */
+  /** Hovering the value shows a Paid / Unpaid breakdown tooltip. */
   valueBreakdown?: AnalyticsStatValueBreakdown;
   avatar?: ReactNode;
   /** Full label shown on hover when the visible value is abbreviated (e.g. person name). */
@@ -48,83 +48,77 @@ function StatBreakdownTooltip({ paid, unpaid }: AnalyticsStatValueBreakdown) {
   );
 }
 
-function StatSection({ item, index }: { item: AnalyticsStatItem; index: number }) {
-  const interactive = Boolean(item.valueBreakdown);
+function renderStatValue(item: AnalyticsStatItem) {
+  const valueClassName =
+    item.valueVariant === 'person'
+      ? 'analytics-stat-bar__value analytics-stat-bar__value--person'
+      : 'analytics-stat-bar__value';
 
-  const section = (
-    <section
-      className={
-        interactive
-          ? 'analytics-stat-bar__section analytics-stat-bar__section--interactive'
-          : 'analytics-stat-bar__section'
-      }
-    >
-      {index > 0 ? <div className="analytics-stat-bar__divider" aria-hidden /> : null}
-      <div className="analytics-stat-bar__title">
-        <span>{item.title}</span>
-      </div>
-      <div className="analytics-stat-bar__note">{item.note ?? ''}</div>
-      <div className="analytics-stat-bar__content">
-        <div
-          className={
-            item.avatar
-              ? 'analytics-stat-bar__value-wrap analytics-stat-bar__value-wrap--person'
-              : 'analytics-stat-bar__value-wrap'
-          }
-        >
-          {item.avatar ? <span className="analytics-stat-bar__avatar">{item.avatar}</span> : null}
-          {item.valueVariant === 'person' && item.valueTitle ? (
-            <Tooltip title={item.valueTitle}>
-              <span
-                className="analytics-stat-bar__value analytics-stat-bar__value--person"
-                tabIndex={0}
-              >
-                {item.value}
-              </span>
-            </Tooltip>
-          ) : (
-            <span
-              className={
-                item.valueVariant === 'person'
-                  ? 'analytics-stat-bar__value analytics-stat-bar__value--person'
-                  : 'analytics-stat-bar__value'
-              }
-            >
-              {item.value}
-            </span>
-          )}
-          {item.unit ? <span className="analytics-stat-bar__unit">{item.unit}</span> : null}
+  if (item.valueVariant === 'person' && item.valueTitle) {
+    return (
+      <Tooltip title={item.valueTitle}>
+        <span className={valueClassName} tabIndex={0}>
+          {item.value}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  if (item.valueBreakdown) {
+    return (
+      <Tooltip
+        title={<StatBreakdownTooltip {...item.valueBreakdown} />}
+        placement="right"
+        arrow={{ pointAtCenter: true }}
+        overlayClassName="analytics-stat-bar-cash-tooltip"
+        styles={{ body: { padding: 0, background: 'transparent', boxShadow: 'none' } }}
+      >
+        <span className={`${valueClassName} analytics-stat-bar__value--breakdown`} tabIndex={0}>
+          {item.value}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  return <span className={valueClassName}>{item.value}</span>;
+}
+
+function StatSection({ item, index }: { item: AnalyticsStatItem; index: number }) {
+  return (
+    <div className="analytics-stat-bar__section-wrap">
+      <section className="analytics-stat-bar__section">
+        {index > 0 ? <div className="analytics-stat-bar__divider" aria-hidden /> : null}
+        <div className="analytics-stat-bar__title">
+          <span>{item.title}</span>
         </div>
-        {item.rightLabel ? (
-          <span
+        <div className="analytics-stat-bar__note">{item.note ?? ''}</div>
+        <div className="analytics-stat-bar__content">
+          <div
             className={
-              item.rightLabelTone === 'positive'
-                ? 'analytics-stat-bar__right-label analytics-stat-bar__right-label--positive'
-                : 'analytics-stat-bar__right-label'
+              item.avatar
+                ? 'analytics-stat-bar__value-wrap analytics-stat-bar__value-wrap--person'
+                : 'analytics-stat-bar__value-wrap'
             }
           >
-            {item.rightLabel}
-          </span>
-        ) : null}
-      </div>
-    </section>
+            {item.avatar ? <span className="analytics-stat-bar__avatar">{item.avatar}</span> : null}
+            {renderStatValue(item)}
+            {item.unit ? <span className="analytics-stat-bar__unit">{item.unit}</span> : null}
+          </div>
+          {item.rightLabel ? (
+            <span
+              className={
+                item.rightLabelTone === 'positive'
+                  ? 'analytics-stat-bar__right-label analytics-stat-bar__right-label--positive'
+                  : 'analytics-stat-bar__right-label'
+              }
+            >
+              {item.rightLabel}
+            </span>
+          ) : null}
+        </div>
+      </section>
+    </div>
   );
-
-  const body = item.valueBreakdown ? (
-    <Tooltip
-      title={<StatBreakdownTooltip {...item.valueBreakdown} />}
-      placement="right"
-      arrow={{ pointAtCenter: true }}
-      overlayClassName="analytics-stat-bar-cash-tooltip"
-      styles={{ body: { padding: 0, background: 'transparent', boxShadow: 'none' } }}
-    >
-      {section}
-    </Tooltip>
-  ) : (
-    section
-  );
-
-  return <div className="analytics-stat-bar__section-wrap">{body}</div>;
 }
 
 export function AnalyticsStatBar({ items }: AnalyticsStatBarProps) {

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { Popover, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { THEME_PRIMARY, THEME_PRIMARY_MUTED, THEME_PRIMARY_SOFT } from '../constants/chartColors';
@@ -295,10 +294,6 @@ export function MonthRangePicker({
 
   const displayLabel = useMemo(() => formatMonthRangeDisplayLabel(value), [value]);
 
-  const bumpRange = (delta: number) => {
-    onChange(shiftMonthRangeBy(value, delta));
-  };
-
   const handlePick = (month: Dayjs) => {
     const picked = clampMonth(month);
     if (!anchor) {
@@ -405,15 +400,7 @@ export function MonthRangePicker({
   );
 
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0, ...style }}>
-      <button
-        type="button"
-        aria-label="Shift range earlier"
-        onClick={() => bumpRange(-1)}
-        style={chevronNavBtnStyle}
-      >
-        <LeftOutlined />
-      </button>
+    <div style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, ...style }}>
       <Popover
         open={open}
         onOpenChange={handleOpenChange}
@@ -428,31 +415,16 @@ export function MonthRangePicker({
           boxShadow: '0 6px 16px rgba(0, 0, 0, 0.08)',
         }}
       >
-        <button
-          type="button"
-          style={{
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            padding: '6px 10px',
-            fontSize: 14,
-            color: THEME_PRIMARY,
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-            lineHeight: 1.4,
-          }}
-        >
-          {displayLabel}
+        <button type="button" className="month-range-picker__trigger">
+          <img
+            src="/icons/calendar-range.png"
+            alt=""
+            aria-hidden
+            className="month-range-picker__trigger-icon"
+          />
+          <span>{displayLabel}</span>
         </button>
       </Popover>
-      <button
-        type="button"
-        aria-label="Shift range later"
-        onClick={() => bumpRange(1)}
-        style={chevronNavBtnStyle}
-      >
-        <RightOutlined />
-      </button>
     </div>
   );
 }

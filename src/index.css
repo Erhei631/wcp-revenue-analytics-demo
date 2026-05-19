@@ -254,7 +254,7 @@ svg {
   margin-bottom: 3px;
 }
 
-.analytics-stat-bar__section--interactive {
+.analytics-stat-bar__value--breakdown {
   cursor: default;
 }
 
@@ -541,6 +541,7 @@ svg {
 .revenue-by-client-rank__name {
   color: #262626;
   font-size: 13px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -551,7 +552,7 @@ svg {
 }
 
 .revenue-by-client-rank__total {
-  font-size: 16px !important;
+  font-size: 14px !important;
   color: #1f1f1f !important;
   letter-spacing: -0.3px;
 }
@@ -636,6 +637,34 @@ svg {
   display: inline-block;
   width: 18px;
   flex-shrink: 0;
+}
+
+.account-overview-chart {
+  width: 100%;
+}
+
+.account-overview-chart--scrollable {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.account-overview-chart--scrollable .account-overview-chart__inner {
+  flex-shrink: 0;
+}
+
+.account-overview-chart__inner {
+  position: relative;
+}
+
+.account-overview-chart__inner--tooltip-open .recharts-surface {
+  pointer-events: none !important;
+}
+
+.account-overview-chart__tooltip-floating {
+  position: absolute;
+  z-index: 20;
+  pointer-events: auto;
+  transform: translate(-50%, calc(-100% - 10px));
 }
 
 .account-overview-chart .recharts-default-legend {
@@ -756,14 +785,14 @@ svg {
   border-radius: 10px !important;
   margin: 0 24px !important;
   margin-bottom: 0 !important;
-  border: 1px solid rgba(70, 155, 255, 0.1) !important;
-  background: linear-gradient(326deg, #e3f0ff 15.72%, #fff 45.78%) !important;
-  box-shadow: 0 0 5px 0 rgba(232, 232, 232, 0.6) !important;
+  border: 1px solid #f0f0f0 !important;
+  border-top: 4px solid #469bff !important;
+  background: #fff !important;
   overflow: hidden;
 }
 
 .revenue-analytics-page__filters .ant-card-body {
-  background: transparent !important;
+  background: rgba(255, 255, 255, 1) !important;
 }
 
 .revenue-analytics-page__filters-inner {
@@ -772,6 +801,43 @@ svg {
   align-items: center;
   gap: 20px;
   row-gap: 14px;
+}
+
+.revenue-analytics-page__filters-date-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.revenue-analytics-page__filters-divider {
+  width: 1px;
+  height: 24px;
+  background: #e8e8e8;
+  flex-shrink: 0;
+}
+
+.month-range-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 14px;
+  color: var(--theme-primary, #469bff);
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.month-range-picker__trigger-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: block;
+  object-fit: contain;
 }
 
 /* Billing dashboard — Revenue Analytics toolbar button */

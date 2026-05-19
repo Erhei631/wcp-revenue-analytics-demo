@@ -1005,15 +1005,18 @@ export default function SalesRevenueAnalyticsPage() {
           styles={{ body: { padding: '16px 18px 14px' } }}
         >
           <div className="revenue-analytics-page__filters-inner">
-            <MonthRangePicker
-              value={monthRange}
-              activePreset={activePreset}
-              referenceDate={REPORTING_END}
-              onChange={(next, preset) => {
-                setMonthRange(normalizeMonthRange(next));
-                setActivePreset(preset ?? null);
-              }}
-            />
+            <div className="revenue-analytics-page__filters-date-group">
+              <MonthRangePicker
+                value={monthRange}
+                activePreset={activePreset}
+                referenceDate={REPORTING_END}
+                onChange={(next, preset) => {
+                  setMonthRange(normalizeMonthRange(next));
+                  setActivePreset(preset ?? null);
+                }}
+              />
+              <span className="revenue-analytics-page__filters-divider" aria-hidden />
+            </div>
             <Select
               mode="multiple"
               allowClear

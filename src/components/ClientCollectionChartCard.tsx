@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { Button, Card, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import {
@@ -7,127 +15,77 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  Tooltip as RTooltip,
   XAxis,
   YAxis,
+  type BarRectangleItem,
 } from 'recharts';
 import { THEME_PRIMARY } from '../constants/chartColors';
+import {
+  COLLECTION_CLIENT_GROUPS,
+  type CollectionClientGroup,
+  type CollectionProjectDef,
+} from '../data/collectionClientDemo';
+import { DEMO_CLIENT_IDS, type DemoClientId } from '../data/demoClientCatalog';
+import type { DemoRepKey } from '../data/analyticsDemoSeries';
 
 const { Text, Title } = Typography;
 
-const FEE_EQUITY = THEME_PRIMARY;
-const FEE_PAID = '#57CEF4';
-const FEE_UNPAID = '#FFB800';
+const FEE_EQUITY = '#FFB800';
+const FEE_PAID = THEME_PRIMARY;
+const FEE_UNPAID = '#57CEF4';
 const DEMO_PERIOD_COUNT = 5;
+const CHART_HEIGHT = 360;
+const CHART_Y_AXIS_WIDTH = 56;
+const CHART_MARGIN = { top: 8, right: 12, left: 0, bottom: 8 };
+const BAR_MIN_WIDTH = 24;
+const BAR_MAX_WIDTH = 60;
+const MIN_CATEGORY_GAP = 6;
 
-type RepKey = 'alice' | 'bob' | 'carol' | 'david';
+function useChartContainerWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
 
-import {
-  DEMO_CLIENT_IDS,
-  type DemoClientId,
-} from '../data/demoClientCatalog';
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(Math.round(entry.contentRect.width));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, width };
+}
+
+function computeClientBarLayout(plotWidth: number, barCount: number) {
+  if (barCount <= 0 || plotWidth <= 0) {
+    return { barSize: BAR_MAX_WIDTH, categoryGap: 8, needsScroll: false, contentWidth: plotWidth };
+  }
+
+  const minContentWidth = barCount * BAR_MIN_WIDTH + Math.max(0, barCount - 1) * MIN_CATEGORY_GAP;
+
+  if (plotWidth < minContentWidth) {
+    const slot = minContentWidth / barCount;
+    return {
+      barSize: BAR_MIN_WIDTH,
+      categoryGap: Math.max(MIN_CATEGORY_GAP, Math.round(slot - BAR_MIN_WIDTH)),
+      needsScroll: true,
+      contentWidth: minContentWidth,
+    };
+  }
+
+  const slot = plotWidth / barCount;
+  const barSize = Math.min(BAR_MAX_WIDTH, Math.max(BAR_MIN_WIDTH, Math.round(slot * 0.72)));
+  const categoryGap = Math.max(MIN_CATEGORY_GAP, Math.round(slot - barSize));
+
+  return { barSize, categoryGap, needsScroll: false, contentWidth: plotWidth };
+}
 
 export type CollectionChartClientFilter = DemoClientId[];
 
-type CollectionProjectDef = {
-  key: string;
-  name: string;
-  weight: number;
-};
-
-type CollectionClientGroup = {
-  key: string;
-  label: string;
-  owner: RepKey;
-  /** Toolbar client filter id; omitted for demo-only clients shown only when unfiltered. */
-  filterClientId?: DemoClientId;
-  equity: number;
-  paid: number;
-  unpaid: number;
-  projects: CollectionProjectDef[];
-};
-
-const COLLECTION_CLIENT_GROUPS: CollectionClientGroup[] = [
-  {
-    key: 'apex',
-    label: 'Client Apex',
-    owner: 'alice',
-    filterClientId: 'apex',
-    equity: 45_000,
-    paid: 132_000,
-    unpaid: 26_000,
-    projects: [
-      { key: 'apex-erp', name: 'ERP rollout', weight: 0.28 },
-      { key: 'apex-saas', name: 'Northwind SaaS', weight: 0.22 },
-      { key: 'apex-dw', name: 'Data warehouse', weight: 0.2 },
-      { key: 'apex-support', name: 'Support retainer', weight: 0.18 },
-      { key: 'apex-security', name: 'Security audit', weight: 0.12 },
-    ],
-  },
-  {
-    key: 'bolt',
-    label: 'Client Bolt',
-    owner: 'bob',
-    filterClientId: 'bolt',
-    equity: 28_000,
-    paid: 84_000,
-    unpaid: 8_000,
-    projects: [
-      { key: 'bolt-data', name: 'Data platform', weight: 0.4 },
-      { key: 'bolt-analytics', name: 'Contoso Analytics', weight: 0.28 },
-      { key: 'bolt-api', name: 'API gateway', weight: 0.2 },
-      { key: 'bolt-monitor', name: 'Monitoring', weight: 0.12 },
-    ],
-  },
-  {
-    key: 'core',
-    label: 'Client Core',
-    owner: 'carol',
-    filterClientId: 'core',
-    equity: 40_000,
-    paid: 112_000,
-    unpaid: 23_000,
-    projects: [
-      { key: 'core-billing', name: 'Billing integration', weight: 0.3 },
-      { key: 'core-support', name: 'Fabrikam Support', weight: 0.25 },
-      { key: 'core-payments', name: 'Payment gateway', weight: 0.2 },
-      { key: 'core-compliance', name: 'Compliance', weight: 0.15 },
-      { key: 'core-training', name: 'Training', weight: 0.1 },
-    ],
-  },
-  {
-    key: 'dusk',
-    label: 'Client Dusk',
-    owner: 'david',
-    filterClientId: 'dusk',
-    equity: 24_000,
-    paid: 68_000,
-    unpaid: 12_000,
-    projects: [
-      { key: 'dusk-mobile', name: 'Mobile app', weight: 0.38 },
-      { key: 'dusk-iot', name: 'Tailspin IoT', weight: 0.32 },
-      { key: 'dusk-wearables', name: 'Wearables', weight: 0.18 },
-      { key: 'dusk-push', name: 'Push notifications', weight: 0.12 },
-    ],
-  },
-  {
-    key: 'edge',
-    label: 'Client Edge',
-    owner: 'bob',
-    equity: 28_000,
-    paid: 82_000,
-    unpaid: 10_000,
-    projects: [
-      { key: 'edge-cloud', name: 'Cloud migration', weight: 0.3 },
-      { key: 'edge-ops', name: 'Ops dashboard', weight: 0.25 },
-      { key: 'edge-devops', name: 'DevOps pipeline', weight: 0.2 },
-      { key: 'edge-cost', name: 'Cost optimization', weight: 0.15 },
-      { key: 'edge-dr', name: 'DR failover', weight: 0.1 },
-    ],
-  },
-];
-
-export type CollectionChartSalesFilter = RepKey[];
+export type CollectionChartSalesFilter = DemoRepKey[];
 
 function isAllClientsSelected(clientIds: CollectionChartClientFilter) {
   return clientIds.length === 0 || clientIds.length === DEMO_CLIENT_IDS.length;
@@ -206,7 +164,6 @@ function isAllSalesSelected(salesKeys: CollectionChartSalesFilter) {
 
 function matchesClientFilter(group: CollectionClientGroup, clientIds: CollectionChartClientFilter) {
   if (isAllClientsSelected(clientIds)) return true;
-  if (!group.filterClientId) return false;
   return clientIds.includes(group.filterClientId);
 }
 
@@ -231,7 +188,8 @@ function buildClientRows(
       const unpaid = scaleForPeriod(group.unpaid, periodCount);
       return toBarRow(group.key, group.label, equity, paid, unpaid);
     })
-    .filter((row) => row.serviceFeeTotal > 0);
+    .filter((row) => row.serviceFeeTotal > 0)
+    .sort((a, b) => b.serviceFeeTotal - a.serviceFeeTotal);
 }
 
 function buildProjectRows(clientKey: string, periodCount: number): CollectionBarRow[] {
@@ -254,26 +212,28 @@ const chartTooltipShellStyle: CSSProperties = {
 };
 
 function CollectionTooltip({
-  active,
-  payload,
+  row,
   canDrillToProjects,
   onProjectDetails,
+  onMouseEnter,
+  onMouseLeave,
 }: {
-  active?: boolean;
-  payload?: ReadonlyArray<{ payload?: CollectionBarRow }>;
+  row: CollectionBarRow;
   canDrillToProjects?: boolean;
   onProjectDetails?: (row: CollectionBarRow) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }) {
-  if (!active || !payload?.length) return null;
-
-  const row = payload[0]?.payload;
-  if (!row) return null;
-
   const isClientBar = COLLECTION_CLIENT_GROUPS.some((g) => g.key === row.key);
   const showProjectDetails = Boolean(canDrillToProjects && isClientBar && onProjectDetails);
 
   return (
-    <div style={chartTooltipShellStyle} className="collection-tooltip">
+    <div
+      style={chartTooltipShellStyle}
+      className="collection-tooltip"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <div className="collection-tooltip__header">{row.label}</div>
       <div className="collection-tooltip__divider" />
       <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
@@ -308,6 +268,7 @@ function CollectionTooltip({
     </div>
   );
 }
+
 function TooltipRow({
   color,
   label,
@@ -339,6 +300,88 @@ function TooltipRow({
   );
 }
 
+function renderAccountOverviewBars({
+  activeDrillKey,
+  chartMax,
+  handleBarAreaClick,
+  barSize,
+  onBarMouseEnter,
+  onBarMouseLeave,
+}: {
+  activeDrillKey: string | null;
+  chartMax: number;
+  handleBarAreaClick: (row: CollectionBarRow) => void;
+  barSize: number;
+  onBarMouseEnter: (data: BarRectangleItem, event: ReactMouseEvent<SVGPathElement>) => void;
+  onBarMouseLeave: (event: ReactMouseEvent<SVGPathElement>) => void;
+}) {
+  return (
+    <>
+      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+      <XAxis
+        dataKey="label"
+        tick={{ fontSize: activeDrillKey ? 11 : 11 }}
+        axisLine={{ stroke: '#e8e8e8' }}
+        interval={0}
+        angle={activeDrillKey ? -28 : -35}
+        textAnchor="end"
+        height={activeDrillKey ? 72 : 88}
+      />
+      <YAxis
+        tickFormatter={(v) => axisMoneyShort(Number(v))}
+        domain={[0, chartMax]}
+        tick={{ fontSize: 12 }}
+        width={56}
+        axisLine={{ stroke: '#e8e8e8' }}
+      />
+      <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+      <Bar
+        dataKey="paid"
+        name="Cash Paid"
+        stackId="fee"
+        barSize={barSize}
+        fill={FEE_PAID}
+        cursor={activeDrillKey ? 'default' : 'pointer'}
+        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
+        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
+        onClick={(entry) => {
+          if (activeDrillKey || !entry?.payload) return;
+          handleBarAreaClick(entry.payload as CollectionBarRow);
+        }}
+      />
+      <Bar
+        dataKey="unpaid"
+        name="Cash Unpaid"
+        stackId="fee"
+        barSize={barSize}
+        fill={FEE_UNPAID}
+        cursor={activeDrillKey ? 'default' : 'pointer'}
+        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
+        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
+        onClick={(entry) => {
+          if (activeDrillKey || !entry?.payload) return;
+          handleBarAreaClick(entry.payload as CollectionBarRow);
+        }}
+      />
+      <Bar
+        dataKey="equity"
+        name="Equity"
+        stackId="fee"
+        barSize={barSize}
+        fill={FEE_EQUITY}
+        radius={[4, 4, 0, 0]}
+        cursor={activeDrillKey ? 'default' : 'pointer'}
+        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
+        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
+        onClick={(entry) => {
+          if (activeDrillKey || !entry?.payload) return;
+          handleBarAreaClick(entry.payload as CollectionBarRow);
+        }}
+      />
+    </>
+  );
+}
+
 type ClientCollectionChartCardProps = {
   filterScopeKey: string;
   periodCount: number;
@@ -353,9 +396,16 @@ export function ClientCollectionChartCard({
   selectedClientIds,
 }: ClientCollectionChartCardProps) {
   const [clickedDrillKey, setClickedDrillKey] = useState<string | null>(null);
+  const [tooltipRow, setTooltipRow] = useState<CollectionBarRow | null>(null);
+  const [tooltipAnchor, setTooltipAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [tooltipPinned, setTooltipPinned] = useState(false);
+  const chartInnerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setClickedDrillKey(null);
+    setTooltipRow(null);
+    setTooltipAnchor(null);
+    setTooltipPinned(false);
   }, [filterScopeKey]);
 
   const filterDrillKey = useMemo(() => {
@@ -387,10 +437,65 @@ export function ClientCollectionChartCard({
     return Math.max(20_000, Math.ceil(max * 1.12));
   }, [chartRows]);
 
+  const { ref: chartContainerRef, width: chartContainerWidth } = useChartContainerWidth();
+  const plotWidth = Math.max(0, chartContainerWidth - CHART_Y_AXIS_WIDTH - CHART_MARGIN.right);
+  const barLayout = useMemo(
+    () => computeClientBarLayout(plotWidth, chartRows.length),
+    [chartRows.length, plotWidth],
+  );
+  const chartInnerWidth = barLayout.needsScroll
+    ? barLayout.contentWidth + CHART_Y_AXIS_WIDTH + CHART_MARGIN.right
+    : undefined;
+
   const handleBarAreaClick = (row: CollectionBarRow) => {
     if (activeDrillKey) return;
     setClickedDrillKey(row.key);
   };
+
+  const clearTooltip = useCallback(() => {
+    setTooltipRow(null);
+    setTooltipAnchor(null);
+    setTooltipPinned(false);
+  }, []);
+
+  const isTooltipTarget = useCallback((node: EventTarget | null) => {
+    if (!(node instanceof Node)) return false;
+    return Boolean(
+      chartInnerRef.current?.contains(node) &&
+        (node instanceof Element ? node.closest('.account-overview-chart__tooltip-floating') : false),
+    );
+  }, []);
+
+  const handleBarMouseEnter = useCallback((data: BarRectangleItem) => {
+    const row = data.payload as CollectionBarRow | undefined;
+    if (!row) return;
+
+    setTooltipRow(row);
+    setTooltipAnchor({
+      x: data.tooltipPosition.x,
+      y: data.tooltipPosition.y,
+    });
+  }, []);
+
+  const handleBarMouseLeave = useCallback(
+    (event: ReactMouseEvent<SVGPathElement>) => {
+      if (tooltipPinned) return;
+      if (isTooltipTarget(event.relatedTarget)) return;
+      // Tooltip is open — ignore bar mouseleave while moving onto the floating panel.
+      if (tooltipRow) return;
+      clearTooltip();
+    },
+    [clearTooltip, isTooltipTarget, tooltipPinned, tooltipRow],
+  );
+
+  const handleChartInnerMouseLeave = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (tooltipPinned) return;
+      if (isTooltipTarget(event.relatedTarget)) return;
+      clearTooltip();
+    },
+    [clearTooltip, isTooltipTarget, tooltipPinned],
+  );
 
   if (chartRows.length === 0) {
     return (
@@ -440,79 +545,65 @@ export function ClientCollectionChartCard({
         ) : null}
       </div>
 
-      <div className="account-overview-chart" style={{ width: '100%', height: 360 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            key={`${filterScopeKey}-${activeDrillKey ?? 'clients'}`}
-            data={chartRows}
-            margin={{ top: 8, right: 12, left: 0, bottom: activeDrillKey ? 4 : 8 }}
-            barCategoryGap={activeDrillKey ? '12%' : '18%'}
-            maxBarSize={60}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: activeDrillKey ? 11 : 12 }}
-              axisLine={{ stroke: '#e8e8e8' }}
-              interval={0}
-              angle={activeDrillKey ? -28 : 0}
-              textAnchor={activeDrillKey ? 'end' : 'middle'}
-              height={activeDrillKey ? 72 : 30}
-            />
-            <YAxis
-              tickFormatter={(v) => axisMoneyShort(Number(v))}
-              domain={[0, chartMax]}
-              tick={{ fontSize: 12 }}
-              width={56}
-              axisLine={{ stroke: '#e8e8e8' }}
-            />
-            <RTooltip
-              content={(tooltipProps) => (
-                <CollectionTooltip
-                  {...tooltipProps}
-                  canDrillToProjects={!activeDrillKey}
-                  onProjectDetails={handleBarAreaClick}
-                />
-              )}
-              cursor={{ fill: 'rgba(70, 155, 255, 0.06)' }}
-            />
-            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-            <Bar
-              dataKey="equity"
-              name="Equity"
-              stackId="fee"
-              fill={FEE_EQUITY}
-              cursor={activeDrillKey ? 'default' : 'pointer'}
-              onClick={(entry) => {
-                if (activeDrillKey || !entry?.payload) return;
-                handleBarAreaClick(entry.payload as CollectionBarRow);
-              }}
-            />
-            <Bar
-              dataKey="paid"
-              name="Cash Paid"
-              stackId="fee"
-              fill={FEE_PAID}
-              cursor={activeDrillKey ? 'default' : 'pointer'}
-              onClick={(entry) => {
-                if (activeDrillKey || !entry?.payload) return;
-                handleBarAreaClick(entry.payload as CollectionBarRow);
-              }}
-            />
-            <Bar
-              dataKey="unpaid"
-              name="Cash Unpaid"
-              stackId="fee"
-              fill={FEE_UNPAID}
-              radius={[4, 4, 0, 0]}
-              cursor={activeDrillKey ? 'default' : 'pointer'}
-              onClick={(entry) => {
-                if (activeDrillKey || !entry?.payload) return;
-                handleBarAreaClick(entry.payload as CollectionBarRow);
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+      <div
+        ref={chartContainerRef}
+        className={
+          barLayout.needsScroll
+            ? 'account-overview-chart account-overview-chart--scrollable'
+            : 'account-overview-chart'
+        }
+        style={{ height: CHART_HEIGHT }}
+      >
+        <div
+          ref={chartInnerRef}
+          className={
+            tooltipRow
+              ? 'account-overview-chart__inner account-overview-chart__inner--tooltip-open'
+              : 'account-overview-chart__inner'
+          }
+          style={{
+            width: chartInnerWidth ?? '100%',
+            minWidth: '100%',
+            height: CHART_HEIGHT,
+          }}
+          onMouseLeave={handleChartInnerMouseLeave}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              key={`${filterScopeKey}-${activeDrillKey ?? 'clients'}`}
+              data={chartRows}
+              margin={CHART_MARGIN}
+              barCategoryGap={barLayout.categoryGap}
+              maxBarSize={BAR_MAX_WIDTH}
+            >
+              {renderAccountOverviewBars({
+                activeDrillKey,
+                chartMax,
+                handleBarAreaClick,
+                barSize: barLayout.barSize,
+                onBarMouseEnter: handleBarMouseEnter,
+                onBarMouseLeave: handleBarMouseLeave,
+              })}
+            </BarChart>
+          </ResponsiveContainer>
+          {tooltipRow && tooltipAnchor ? (
+            <div
+              className="account-overview-chart__tooltip-floating"
+              style={{ left: tooltipAnchor.x, top: tooltipAnchor.y }}
+              onMouseEnter={() => setTooltipPinned(true)}
+              onMouseLeave={() => clearTooltip()}
+            >
+              <CollectionTooltip
+                row={tooltipRow}
+                canDrillToProjects={!activeDrillKey}
+                onProjectDetails={(row) => {
+                  clearTooltip();
+                  handleBarAreaClick(row);
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     </Card>
   );
