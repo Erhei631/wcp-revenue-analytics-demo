@@ -83,7 +83,7 @@ export function RevenueByClientRankList({
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--expand" aria-hidden>
           <span className="analytics-revenue-expand-spacer" />
         </span>
-        <span className="revenue-by-client-rank__col revenue-by-client-rank__col--name">Name</span>
+        <span className="revenue-by-client-rank__col revenue-by-client-rank__col--name">Client Name</span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--total">Total</span>
       </div>
       <div className="revenue-by-client-rank__body">
