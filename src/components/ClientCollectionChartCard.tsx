@@ -303,14 +303,14 @@ function TooltipRow({
 function renderAccountOverviewBars({
   activeDrillKey,
   chartMax,
-  handleBarAreaClick,
+  onBarClick,
   barSize,
   onBarMouseEnter,
   onBarMouseLeave,
 }: {
   activeDrillKey: string | null;
   chartMax: number;
-  handleBarAreaClick: (row: CollectionBarRow) => void;
+  onBarClick: (row: CollectionBarRow) => void;
   barSize: number;
   onBarMouseEnter: (data: BarRectangleItem, event: ReactMouseEvent<SVGPathElement>) => void;
   onBarMouseLeave: (event: ReactMouseEvent<SVGPathElement>) => void;
@@ -346,7 +346,7 @@ function renderAccountOverviewBars({
         onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
         onClick={(entry) => {
           if (activeDrillKey || !entry?.payload) return;
-          handleBarAreaClick(entry.payload as CollectionBarRow);
+          onBarClick(entry.payload as CollectionBarRow);
         }}
       />
       <Bar
@@ -360,7 +360,7 @@ function renderAccountOverviewBars({
         onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
         onClick={(entry) => {
           if (activeDrillKey || !entry?.payload) return;
-          handleBarAreaClick(entry.payload as CollectionBarRow);
+          onBarClick(entry.payload as CollectionBarRow);
         }}
       />
       <Bar
@@ -375,7 +375,7 @@ function renderAccountOverviewBars({
         onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
         onClick={(entry) => {
           if (activeDrillKey || !entry?.payload) return;
-          handleBarAreaClick(entry.payload as CollectionBarRow);
+          onBarClick(entry.payload as CollectionBarRow);
         }}
       />
     </>
@@ -458,6 +458,14 @@ export function ClientCollectionChartCard({
     setTooltipPinned(false);
   }, []);
 
+  const handleBarClick = useCallback(
+    (row: CollectionBarRow) => {
+      clearTooltip();
+      handleBarAreaClick(row);
+    },
+    [activeDrillKey, clearTooltip],
+  );
+
   const isTooltipTarget = useCallback((node: EventTarget | null) => {
     if (!(node instanceof Node)) return false;
     return Boolean(
@@ -481,11 +489,9 @@ export function ClientCollectionChartCard({
     (event: ReactMouseEvent<SVGPathElement>) => {
       if (tooltipPinned) return;
       if (isTooltipTarget(event.relatedTarget)) return;
-      // Tooltip is open — ignore bar mouseleave while moving onto the floating panel.
-      if (tooltipRow) return;
       clearTooltip();
     },
-    [clearTooltip, isTooltipTarget, tooltipPinned, tooltipRow],
+    [clearTooltip, isTooltipTarget, tooltipPinned],
   );
 
   const handleChartInnerMouseLeave = useCallback(
@@ -557,7 +563,7 @@ export function ClientCollectionChartCard({
         <div
           ref={chartInnerRef}
           className={
-            tooltipRow
+            tooltipPinned
               ? 'account-overview-chart__inner account-overview-chart__inner--tooltip-open'
               : 'account-overview-chart__inner'
           }
@@ -579,7 +585,7 @@ export function ClientCollectionChartCard({
               {renderAccountOverviewBars({
                 activeDrillKey,
                 chartMax,
-                handleBarAreaClick,
+                onBarClick: handleBarClick,
                 barSize: barLayout.barSize,
                 onBarMouseEnter: handleBarMouseEnter,
                 onBarMouseLeave: handleBarMouseLeave,
