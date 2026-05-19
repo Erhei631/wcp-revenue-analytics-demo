@@ -19,6 +19,7 @@ export type ClientRankRow = {
   key: string;
   rank: number;
   name: string;
+  sales: string;
   color: string;
   total: number;
   series: number[];
@@ -84,6 +85,7 @@ export function RevenueByClientRankList({
           <span className="analytics-revenue-expand-spacer" />
         </span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--name">Client Name</span>
+        <span className="revenue-by-client-rank__col revenue-by-client-rank__col--sales">Sales</span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--total">Total</span>
       </div>
       <div className="revenue-by-client-rank__body">
@@ -116,6 +118,9 @@ export function RevenueByClientRankList({
                 <div className="revenue-by-client-rank__col revenue-by-client-rank__col--name">
                   <span className="revenue-by-client-rank__rank">#{row.rank}</span>
                   <span className="revenue-by-client-rank__name">{row.name}</span>
+                </div>
+                <div className="revenue-by-client-rank__col revenue-by-client-rank__col--sales">
+                  <span className="revenue-by-client-rank__sales">{row.sales}</span>
                 </div>
                 <div className="revenue-by-client-rank__col revenue-by-client-rank__col--total">
                   <Text strong className="revenue-by-client-rank__total">

@@ -33,6 +33,13 @@ const { Text, Title } = Typography;
 const FEE_EQUITY = '#FFB800';
 const FEE_PAID = THEME_PRIMARY;
 const FEE_UNPAID = '#57CEF4';
+
+const SALES_REP_LABELS: Record<DemoRepKey, string> = {
+  alice: 'Alice Chen',
+  bob: 'Bob Li',
+  carol: 'Carol Wang',
+  david: 'David Park',
+};
 const DEMO_PERIOD_COUNT = 5;
 const CHART_HEIGHT = 360;
 const CHART_Y_AXIS_WIDTH = 56;
@@ -192,6 +199,20 @@ function buildClientRows(
     .sort((a, b) => b.serviceFeeTotal - a.serviceFeeTotal);
 }
 
+function collectionGroupForRow(row: CollectionBarRow) {
+  return (
+    COLLECTION_CLIENT_GROUPS.find((g) => g.key === row.key) ??
+    COLLECTION_CLIENT_GROUPS.find((g) => g.projects.some((p) => p.key === row.key)) ??
+    null
+  );
+}
+
+function salesLabelForRow(row: CollectionBarRow) {
+  const group = collectionGroupForRow(row);
+  if (!group) return null;
+  return SALES_REP_LABELS[group.owner] ?? null;
+}
+
 function buildProjectRows(clientKey: string, periodCount: number): CollectionBarRow[] {
   const group = COLLECTION_CLIENT_GROUPS.find((g) => g.key === clientKey);
   if (!group) return [];
@@ -226,6 +247,7 @@ function CollectionTooltip({
 }) {
   const isClientBar = COLLECTION_CLIENT_GROUPS.some((g) => g.key === row.key);
   const showProjectDetails = Boolean(canDrillToProjects && isClientBar && onProjectDetails);
+  const salesLabel = salesLabelForRow(row);
 
   return (
     <div
@@ -234,7 +256,10 @@ function CollectionTooltip({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="collection-tooltip__header">{row.label}</div>
+      <div className="collection-tooltip__header-block">
+        <div className="collection-tooltip__header">{row.label}</div>
+        {salesLabel ? <div className="collection-tooltip__sales">Sales: {salesLabel}</div> : null}
+      </div>
       <div className="collection-tooltip__divider" />
       <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
       <div className="collection-tooltip__divider" />

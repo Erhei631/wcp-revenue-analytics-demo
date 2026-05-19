@@ -759,16 +759,14 @@ export default function SalesRevenueAnalyticsPage() {
               ) : (
                 <span className="analytics-revenue-expand-spacer" aria-hidden />
               )}
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: record.color,
-                  display: 'inline-block',
-                  flexShrink: 0,
-                }}
-              />
+              <Avatar
+                size={28}
+                src={REP_DEFS.find((r) => r.key === record.key)?.avatarUrl}
+                alt={name}
+                style={{ flexShrink: 0, backgroundColor: record.color }}
+              >
+                {personInitials(name)}
+              </Avatar>
               <Text>{name}</Text>
             </Space>
           );
@@ -871,9 +869,12 @@ export default function SalesRevenueAnalyticsPage() {
         .map((client) => {
           const raw = view.byClient[client.key] ?? [];
           const total = raw.reduce((sum, value) => sum + value, 0);
+          const ownerKey = CLIENT_OWNER[client.key];
+          const sales = REP_DEFS.find((r) => r.key === ownerKey)?.name ?? '—';
           return {
             key: client.key,
             name: client.name,
+            sales,
             color: client.color,
             total,
             series: raw,
