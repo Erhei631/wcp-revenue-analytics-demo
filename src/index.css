@@ -459,7 +459,7 @@ svg {
 
 .revenue-by-client-rank__header {
   display: grid;
-  grid-template-columns: 18px minmax(180px, 1.4fr) 88px 120px;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px;
   gap: 12px;
   align-items: center;
   padding: 0 8px 10px;
@@ -488,7 +488,7 @@ svg {
 
 .revenue-by-client-rank__row {
   display: grid;
-  grid-template-columns: 18px minmax(180px, 1.4fr) 88px 120px;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -555,34 +555,6 @@ svg {
   font-size: 14px !important;
   color: #1f1f1f !important;
   letter-spacing: -0.3px;
-}
-
-.revenue-by-client-rank__col--change {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.revenue-by-client-rank__info {
-  margin-left: 4px;
-  color: #bfbfbf;
-  font-size: 12px;
-  cursor: help;
-}
-
-.revenue-by-client-rank__change {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.revenue-by-client-rank__change--up {
-  color: var(--rank-trend-up, var(--theme-primary, #469bff));
-}
-
-.revenue-by-client-rank__change--down {
-  color: var(--rank-trend-down, #edab00);
 }
 
 /* Sales revenue analytics — revenue breakdown table */

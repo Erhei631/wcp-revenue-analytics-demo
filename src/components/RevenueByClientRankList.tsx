@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CaretDownOutlined, CaretRightOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { Tooltip, Typography } from 'antd';
+import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
+import { Typography } from 'antd';
 import {
   Area,
   AreaChart,
@@ -85,12 +85,6 @@ export function RevenueByClientRankList({
         </span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--name">Name</span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--total">Total</span>
-        <span className="revenue-by-client-rank__col revenue-by-client-rank__col--change">
-          Range change
-          <Tooltip title="Percent change from the first to the last period in the selected range.">
-            <InfoCircleOutlined className="revenue-by-client-rank__info" />
-          </Tooltip>
-        </span>
       </div>
       <div className="revenue-by-client-rank__body">
         {rows.map((row) => {
@@ -127,9 +121,6 @@ export function RevenueByClientRankList({
                   <Text strong className="revenue-by-client-rank__total">
                     {formatTotalShort(row.total)}
                   </Text>
-                </div>
-                <div className="revenue-by-client-rank__col revenue-by-client-rank__col--change">
-                  <RangeChange value={row.rangeChangePct} />
                 </div>
               </button>
 
@@ -189,21 +180,6 @@ export function RevenueByClientRankList({
         })}
       </div>
     </div>
-  );
-}
-
-function RangeChange({ value }: { value: number }) {
-  const positive = value >= 0;
-  return (
-    <span
-      className={
-        positive
-          ? 'revenue-by-client-rank__change revenue-by-client-rank__change--up'
-          : 'revenue-by-client-rank__change revenue-by-client-rank__change--down'
-      }
-    >
-      {positive ? '▲' : '▼'} {Math.abs(value)}%
-    </span>
   );
 }
 
