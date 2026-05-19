@@ -5,15 +5,12 @@ import {
   type FeeAmountProfile,
 } from '../data/accountFeeProfiles';
 import type { DemoClientId } from '../data/demoClientCatalog';
+import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text } = Typography;
 
-function money(n: number) {
-  return `$${n.toLocaleString('en-US')}`;
-}
-
 function moneyShort(n: number) {
-  const abs = Math.abs(n);
+  const abs = Math.abs(coerceAmount(n));
   if (abs >= 1000) {
     const k = Math.round((abs / 1000) * 10) / 10;
     const formatted = Number.isInteger(k) ? String(k) : k.toFixed(1);
@@ -35,8 +32,8 @@ export function ServiceFeeBreakdownCell({
   profile,
   muted = false,
 }: ServiceFeeBreakdownCellProps) {
-  if (serviceFeeTotal <= 0) {
-    return <Text type="secondary">{money(0)}</Text>;
+  if (coerceAmount(serviceFeeTotal) === 0) {
+    return <Text type="secondary">-</Text>;
   }
 
   const feeProfile = profile ?? feeProfileForClientId(clientId);
@@ -46,7 +43,7 @@ export function ServiceFeeBreakdownCell({
   return (
     <div className="analytics-revenue-fee-cell">
       <Text strong={!muted} type={tone} className="analytics-revenue-fee-cell__total">
-        {money(fee.serviceFeeTotal)}
+        {formatMoneyValue(fee.serviceFeeTotal)}
       </Text>
       <Text type="secondary" className="analytics-revenue-fee-cell__part">
         Equity {moneyShort(fee.equity)}

@@ -74,6 +74,7 @@ import {
   THEME_PRIMARY,
 } from '../constants/chartColors';
 import { DashboardShell } from '../layout/DashboardShell';
+import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
 
@@ -205,7 +206,7 @@ function monthlyByRepForClients(clientIds: ClientFilter): Record<RepKey, number[
   for (const id of clientIds) {
     const owner = CLIENT_OWNER[id];
     for (let i = 0; i < PERIODS.length; i++) {
-      merged[owner][i] += CLIENT_MONTHLY_BASE[id][i];
+      merged[owner][i] += coerceAmount(CLIENT_MONTHLY_BASE[id][i]);
     }
   }
 
@@ -254,7 +255,7 @@ function applySalesScope(
       byRep,
       byClient,
       system: Array.from({ length: periodCount }, (_, i) =>
-        REP_KEYS.reduce((sum, key) => sum + (byRep[key][i] ?? 0), 0),
+        REP_KEYS.reduce((sum, key) => sum + coerceAmount(byRep[key][i]), 0),
       ),
     };
   }
@@ -270,7 +271,7 @@ function applySalesScope(
     ]),
   ) as Record<ClientId, number[]>;
   const system = Array.from({ length: periodCount }, (_, i) =>
-    salesKeys.reduce((sum, key) => sum + (scopedByRep[key][i] ?? 0), 0),
+    salesKeys.reduce((sum, key) => sum + coerceAmount(scopedByRep[key][i]), 0),
   );
 
   return { byRep: scopedByRep, byClient: scopedByClient, system };
@@ -292,10 +293,10 @@ function buildResolvedView(
 
   const periods = indices.map((i) => PERIODS[i]);
   const byRep = Object.fromEntries(
-    REP_KEYS.map((k) => [k, indices.map((i) => monthly[k][i])]),
+    REP_KEYS.map((k) => [k, indices.map((i) => coerceAmount(monthly[k][i]))]),
   ) as Record<RepKey, number[]>;
   const byClient = Object.fromEntries(
-    CLIENT_IDS.map((id) => [id, indices.map((i) => monthlyClients[id][i])]),
+    CLIENT_IDS.map((id) => [id, indices.map((i) => coerceAmount(monthlyClients[id][i]))]),
   ) as Record<ClientId, number[]>;
   const { byRep: scopedByRep, byClient: scopedByClient, system } = applySalesScope(
     salesKeys,
@@ -314,10 +315,6 @@ function buildResolvedView(
   };
 }
 
-function money(n: number) {
-  return `$${n.toLocaleString('en-US')}`;
-}
-
 function personInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -325,6 +322,10 @@ function personInitials(name: string) {
   }
   return (parts[0]?.slice(0, 2) ?? '—').toUpperCase();
 }
+
+const REVENUE_BREAKDOWN_NAME_COL_WIDTH = 280;
+const REVENUE_BREAKDOWN_PERIOD_COL_WIDTH = 112;
+const REVENUE_BREAKDOWN_TOTAL_COL_WIDTH = 140;
 
 type RevenueBreakdownRow = {
   key: RepKey;
@@ -435,7 +436,7 @@ function clientRowsForRep(
       key: `${repKey}::${project}`,
       name: project,
       values: childValues,
-      total: childValues.reduce((a, b) => a + b, 0),
+      total: childValues.reduce((a, b) => a + coerceAmount(b), 0),
       clientId: matchedClient?.id,
     };
   });
@@ -447,7 +448,8 @@ function axisMoneyShort(n: number) {
 }
 
 function maxSeries(values: readonly number[]) {
-  return values.length ? Math.max(...values) : 0;
+  const amounts = values.map(coerceAmount);
+  return amounts.length ? Math.max(...amounts) : 0;
 }
 
 function maxChartValue(system: number[], byRep: Record<RepKey, number[]>) {
@@ -549,7 +551,7 @@ function ChartTooltipSeriesRow({
         />
         {name}
       </span>
-      <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{money(amount)}</span>
+      <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{formatMoneyValue(amount)}</span>
     </div>
   );
 }
@@ -614,7 +616,7 @@ function TotalRevenueTrendTooltip({
         }}
       >
         <span style={{ color: '#8c8c8c' }}>Total</span>
-        <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{money(total)}</span>
+        <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{formatMoneyValue(total)}</span>
       </div>
     </div>
   );
@@ -693,7 +695,7 @@ export default function SalesRevenueAnalyticsPage() {
     () =>
       REP_DEFS.map((r) => {
         const values = view.byRep[r.key];
-        const total = values.reduce((a, b) => a + b, 0);
+        const total = values.reduce((a, b) => a + coerceAmount(b), 0);
         return { key: r.key, name: r.name, color: r.color, values, total };
       }),
     [filterScopeKey, view.byRep],
@@ -726,6 +728,14 @@ export default function SalesRevenueAnalyticsPage() {
     }
     return rows;
   }, [expandedRepKeys, filteredTableRows, selectedClientIds]);
+
+  const revenueTableScrollX = useMemo(
+    () =>
+      REVENUE_BREAKDOWN_NAME_COL_WIDTH +
+      view.periods.length * REVENUE_BREAKDOWN_PERIOD_COL_WIDTH +
+      REVENUE_BREAKDOWN_TOTAL_COL_WIDTH,
+    [view.periods.length],
+  );
 
   const columns: TableColumnsType<DisplayRow> = useMemo(
     () => [
@@ -776,8 +786,9 @@ export default function SalesRevenueAnalyticsPage() {
         title: p,
         key: p,
         align: 'right' as const,
+        width: REVENUE_BREAKDOWN_PERIOD_COL_WIDTH,
         render: (_: unknown, record: DisplayRow) => {
-          const amount = record.values[idx] ?? 0;
+          const amount = coerceAmount(record.values[idx]);
           if (record.rowType === 'client') {
             return (
               <ServiceFeeBreakdownCell
@@ -787,7 +798,7 @@ export default function SalesRevenueAnalyticsPage() {
               />
             );
           }
-          return <Text>{money(amount)}</Text>;
+          return <Text>{formatMoney(amount)}</Text>;
         },
       })),
       {
@@ -805,7 +816,7 @@ export default function SalesRevenueAnalyticsPage() {
               />
             );
           }
-          return <Text strong>{money(record.total)}</Text>;
+          return <Text strong>{formatMoney(record.total)}</Text>;
         },
       },
     ],
@@ -822,9 +833,15 @@ export default function SalesRevenueAnalyticsPage() {
     [isAllReps, primarySeries, view.byRep, view.system],
   );
 
-  const viewTotal = useMemo(() => view.system.reduce((a, b) => a + b, 0), [view.system]);
+  const viewTotal = useMemo(
+    () => view.system.reduce((a, b) => a + coerceAmount(b), 0),
+    [view.system],
+  );
 
-  const primaryTotal = useMemo(() => primarySeries.reduce((a, b) => a + b, 0), [primarySeries]);
+  const primaryTotal = useMemo(
+    () => primarySeries.reduce((a, b) => a + coerceAmount(b), 0),
+    [primarySeries],
+  );
 
   const feeProfileForScope = useMemo(() => {
     if (!isAllClientsSelected(selectedClientIds) && selectedClientIds.length === 1) {
@@ -964,7 +981,7 @@ export default function SalesRevenueAnalyticsPage() {
               {personInitials(topRepMeta.name)}
             </Avatar>
           ) : undefined,
-        rightLabel: isSingleRep ? money(viewTotal) : money(topRep.value),
+        rightLabel: isSingleRep ? formatMoneyValue(viewTotal) : formatMoneyValue(topRep.value),
         rightLabelTone: isSingleRep ? 'positive' : 'default',
       },
     ],
@@ -1066,7 +1083,7 @@ export default function SalesRevenueAnalyticsPage() {
             ) : null
           ) : (
             <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              {`${isSingleRep ? selectedRepMeta?.name : formatSalesFilterLabel(selectedSalesKeys)}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} · revenue ($) in this view — team total in same view: ${money(viewTotal)}`}
+              {`${isSingleRep ? selectedRepMeta?.name : formatSalesFilterLabel(selectedSalesKeys)}${clientScopeLabel ? ` · ${clientScopeLabel}` : ''} · revenue ($) in this view — team total in same view: ${formatMoneyValue(viewTotal)}`}
             </Text>
           )}
           <div style={{ width: '100%', height: 320 }}>
@@ -1228,11 +1245,13 @@ export default function SalesRevenueAnalyticsPage() {
               </Text>
             ) : null}
           </Title>
-          <Table<DisplayRow>
+          <div className="analytics-revenue-table-scroll">
+            <Table<DisplayRow>
             key={filterScopeKey}
             className="analytics-revenue-table"
             rowKey="key"
             columns={columns}
+            scroll={{ x: revenueTableScrollX }}
             dataSource={displayTableRows}
             rowClassName={(record) => {
               if (record.rowType === 'client') return 'analytics-revenue-client-row';
@@ -1275,11 +1294,11 @@ export default function SalesRevenueAnalyticsPage() {
                         </Table.Summary.Cell>
                         {view.periods.map((p, idx) => (
                           <Table.Summary.Cell key={p} index={idx + 1} align="right">
-                            <Text strong>{money(view.system[idx])}</Text>
+                            <Text strong>{formatMoney(view.system[idx])}</Text>
                           </Table.Summary.Cell>
                         ))}
                         <Table.Summary.Cell index={view.periods.length + 1} align="right">
-                          <Text strong>{money(viewTotal)}</Text>
+                          <Text strong>{formatMoney(viewTotal)}</Text>
                         </Table.Summary.Cell>
                       </Table.Summary.Row>
                     </Table.Summary>
@@ -1287,6 +1306,7 @@ export default function SalesRevenueAnalyticsPage() {
                 : undefined
             }
           />
+          </div>
         </Card>
       </div>
     </DashboardShell>

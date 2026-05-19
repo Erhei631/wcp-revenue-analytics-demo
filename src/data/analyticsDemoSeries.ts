@@ -39,9 +39,19 @@ function repMonthNoise(rep: DemoRepKey, month: Dayjs): number {
   return ((seed * 11_371) % 10_007) / 10_007 - 0.5;
 }
 
-function valueForMonth(rep: DemoRepKey, month: Dayjs): number {
+function monthTemplate(rep: DemoRepKey, month: Dayjs): number {
   const anchor = ANCHOR_2026_MONTHLY[rep];
-  const template = anchor[month.month()];
+  if (month.year() === 2026 && month.month() >= 0 && month.month() < anchor.length) {
+    return anchor[month.month()] ?? 0;
+  }
+  // Prior-year months use the same seasonal shape (Jan–May anchor slots).
+  const slot = Math.min(month.month(), anchor.length - 1);
+  return anchor[slot] ?? 0;
+}
+
+function valueForMonth(rep: DemoRepKey, month: Dayjs): number {
+  const template = monthTemplate(rep, month);
+  if (!Number.isFinite(template) || template === 0) return 0;
 
   if (month.year() === 2026) {
     return template;
@@ -50,7 +60,8 @@ function valueForMonth(rep: DemoRepKey, month: Dayjs): number {
   const progress = month.month() / 11;
   const yoyFactor = 0.84 + progress * 0.1;
   const jitter = 1 + repMonthNoise(rep, month) * 0.05;
-  return Math.round(template * yoyFactor * jitter);
+  const value = Math.round(template * yoyFactor * jitter);
+  return Number.isFinite(value) ? value : 0;
 }
 
 /** Full monthly revenue series for one sales rep across the demo calendar. */

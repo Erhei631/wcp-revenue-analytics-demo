@@ -572,6 +572,17 @@ svg {
 }
 
 /* Sales revenue analytics — revenue breakdown table */
+.analytics-revenue-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.analytics-revenue-table-scroll .analytics-revenue-table .ant-table-wrapper {
+  max-width: 100%;
+}
+
 .analytics-revenue-table .ant-table-thead > tr > th {
   background: #dfe5ee !important;
 }
@@ -623,6 +634,26 @@ svg {
   display: inline-block;
   width: 18px;
   flex-shrink: 0;
+}
+
+.account-overview-chart__title-row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.account-overview-chart__title-divider {
+  width: 1px;
+  height: 16px;
+  background: #e8e8e8;
+  flex-shrink: 0;
+}
+
+.account-overview-chart__title-sales {
+  font-size: 14px;
+  font-weight: 400;
+  color: #8c8c8c;
 }
 
 .account-overview-chart {

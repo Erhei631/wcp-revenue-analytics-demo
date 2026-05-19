@@ -213,6 +213,10 @@ function salesLabelForRow(row: CollectionBarRow) {
   return SALES_REP_LABELS[group.owner] ?? null;
 }
 
+function isProjectRow(row: CollectionBarRow) {
+  return COLLECTION_CLIENT_GROUPS.some((g) => g.projects.some((p) => p.key === row.key));
+}
+
 function buildProjectRows(clientKey: string, periodCount: number): CollectionBarRow[] {
   const group = COLLECTION_CLIENT_GROUPS.find((g) => g.key === clientKey);
   if (!group) return [];
@@ -246,6 +250,7 @@ function CollectionTooltip({
   onMouseLeave?: () => void;
 }) {
   const isClientBar = COLLECTION_CLIENT_GROUPS.some((g) => g.key === row.key);
+  const isProjectBar = isProjectRow(row);
   const showProjectDetails = Boolean(canDrillToProjects && isClientBar && onProjectDetails);
   const salesLabel = salesLabelForRow(row);
 
@@ -258,20 +263,26 @@ function CollectionTooltip({
     >
       <div className="collection-tooltip__header-block">
         <div className="collection-tooltip__header">{row.label}</div>
-        {salesLabel ? <div className="collection-tooltip__sales">Sales: {salesLabel}</div> : null}
+        {salesLabel && !isProjectBar ? (
+          <div className="collection-tooltip__sales">Sales: {salesLabel}</div>
+        ) : null}
       </div>
       <div className="collection-tooltip__divider" />
       <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
       <div className="collection-tooltip__divider" />
       <div className="collection-tooltip__body">
         <TooltipRow label="Equity" value={money(row.equity)} valueBold />
-        <div className="collection-tooltip-cash">
+        {isProjectBar ? (
           <TooltipRow label="Cash" value={money(row.cash)} valueBold />
-          <div className="collection-tooltip-cash__tree">
-            <TooltipRow color={FEE_PAID} label="Paid" value={money(row.paid)} nested />
-            <TooltipRow color={FEE_UNPAID} label="Unpaid" value={money(row.unpaid)} nested />
+        ) : (
+          <div className="collection-tooltip-cash">
+            <TooltipRow label="Cash" value={money(row.cash)} valueBold />
+            <div className="collection-tooltip-cash__tree">
+              <TooltipRow color={FEE_PAID} label="Paid" value={money(row.paid)} nested />
+              <TooltipRow color={FEE_UNPAID} label="Unpaid" value={money(row.unpaid)} nested />
+            </div>
           </div>
-        </div>
+        )}
       </div>
       {showProjectDetails ? (
         <>
@@ -340,6 +351,21 @@ function renderAccountOverviewBars({
   onBarMouseEnter: (data: BarRectangleItem, event: ReactMouseEvent<SVGPathElement>) => void;
   onBarMouseLeave: (event: ReactMouseEvent<SVGPathElement>) => void;
 }) {
+  const isProjectView = Boolean(activeDrillKey);
+  const barPointerProps = {
+    barSize,
+    stackId: 'fee' as const,
+    cursor: isProjectView ? ('default' as const) : ('pointer' as const),
+    onMouseEnter: (data: BarRectangleItem, _index: number, event: ReactMouseEvent<SVGPathElement>) =>
+      onBarMouseEnter(data, event),
+    onMouseLeave: (_data: BarRectangleItem, _index: number, event: ReactMouseEvent<SVGPathElement>) =>
+      onBarMouseLeave(event),
+    onClick: (entry: BarRectangleItem) => {
+      if (isProjectView || !entry?.payload) return;
+      onBarClick(entry.payload as CollectionBarRow);
+    },
+  };
+
   return (
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -360,49 +386,18 @@ function renderAccountOverviewBars({
         axisLine={{ stroke: '#e8e8e8' }}
       />
       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-      <Bar
-        dataKey="paid"
-        name="Cash Paid"
-        stackId="fee"
-        barSize={barSize}
-        fill={FEE_PAID}
-        cursor={activeDrillKey ? 'default' : 'pointer'}
-        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
-        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
-        onClick={(entry) => {
-          if (activeDrillKey || !entry?.payload) return;
-          onBarClick(entry.payload as CollectionBarRow);
-        }}
-      />
-      <Bar
-        dataKey="unpaid"
-        name="Cash Unpaid"
-        stackId="fee"
-        barSize={barSize}
-        fill={FEE_UNPAID}
-        cursor={activeDrillKey ? 'default' : 'pointer'}
-        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
-        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
-        onClick={(entry) => {
-          if (activeDrillKey || !entry?.payload) return;
-          onBarClick(entry.payload as CollectionBarRow);
-        }}
-      />
-      <Bar
-        dataKey="equity"
-        name="Equity"
-        stackId="fee"
-        barSize={barSize}
-        fill={FEE_EQUITY}
-        radius={[4, 4, 0, 0]}
-        cursor={activeDrillKey ? 'default' : 'pointer'}
-        onMouseEnter={(data, _index, event) => onBarMouseEnter(data, event)}
-        onMouseLeave={(_data, _index, event) => onBarMouseLeave(event)}
-        onClick={(entry) => {
-          if (activeDrillKey || !entry?.payload) return;
-          onBarClick(entry.payload as CollectionBarRow);
-        }}
-      />
+      {isProjectView ? (
+        <>
+          <Bar dataKey="cash" name="Cash" fill={FEE_PAID} {...barPointerProps} />
+          <Bar dataKey="equity" name="Equity" fill={FEE_EQUITY} radius={[4, 4, 0, 0]} {...barPointerProps} />
+        </>
+      ) : (
+        <>
+          <Bar dataKey="paid" name="Cash Paid" fill={FEE_PAID} {...barPointerProps} />
+          <Bar dataKey="unpaid" name="Cash Unpaid" fill={FEE_UNPAID} {...barPointerProps} />
+          <Bar dataKey="equity" name="Equity" fill={FEE_EQUITY} radius={[4, 4, 0, 0]} {...barPointerProps} />
+        </>
+      )}
     </>
   );
 }
@@ -566,7 +561,15 @@ export function ClientCollectionChartCard({
             />
           ) : null}
           <Title level={5} style={{ margin: 0 }}>
-            {drillGroup ? `${drillGroup.label} · projects` : 'Account Overview'}
+            {drillGroup ? (
+              <span className="account-overview-chart__title-row">
+                <span>{drillGroup.label}</span>
+                <span className="account-overview-chart__title-divider" aria-hidden />
+                <span className="account-overview-chart__title-sales">Sales: {SALES_REP_LABELS[drillGroup.owner]}</span>
+              </span>
+            ) : (
+              'Account Overview'
+            )}
           </Title>
         </div>
         {!drillGroup ? (
