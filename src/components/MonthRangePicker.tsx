@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { CaretDownOutlined } from '@ant-design/icons';
 import { Popover, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { THEME_PRIMARY, THEME_PRIMARY_MUTED, THEME_PRIMARY_SOFT } from '../constants/chartColors';
@@ -423,6 +424,16 @@ export function MonthRangePicker({
             className="month-range-picker__trigger-icon"
           />
           <span>{displayLabel}</span>
+          <span
+            className={
+              open
+                ? 'month-range-picker__trigger-caret month-range-picker__trigger-caret--open'
+                : 'month-range-picker__trigger-caret'
+            }
+            aria-hidden
+          >
+            <CaretDownOutlined />
+          </span>
         </button>
       </Popover>
     </div>

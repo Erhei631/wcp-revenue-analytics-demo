@@ -840,6 +840,21 @@ svg {
   object-fit: contain;
 }
 
+.month-range-picker__trigger-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--theme-primary, #469bff);
+  font-size: 11px;
+  line-height: 0;
+  transition: transform 0.2s ease;
+}
+
+.month-range-picker__trigger-caret--open {
+  transform: rotate(180deg);
+}
+
 /* Billing dashboard — Revenue Analytics toolbar button */
 .billing-revenue-analytics-btn.ant-btn-default {
   color: var(--theme-primary, #469bff);
