@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Avatar,
-  Button,
   Card,
-  Col,
   Empty,
-  message,
-  Row,
   Select,
   Space,
   Table,
@@ -17,7 +13,6 @@ import {
   CaretDownFilled,
   CaretDownOutlined,
   CaretRightOutlined,
-  DownloadOutlined,
   LeftOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
@@ -331,34 +326,6 @@ function personInitials(name: string) {
   return (parts[0]?.slice(0, 2) ?? '—').toUpperCase();
 }
 
-function cellToCsv(value: ReactNode) {
-  if (value == null || typeof value === 'boolean') return '';
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  return '';
-}
-
-function escapeCsvCell(value: string | number) {
-  const text = String(value);
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-function downloadCsvFile(filename: string, rows: string[][]) {
-  const content = `\uFEFF${rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n')}`;
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.rel = 'noopener';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
 type RevenueBreakdownRow = {
   key: RepKey;
   name: string;
@@ -366,83 +333,6 @@ type RevenueBreakdownRow = {
   values: number[];
   total: number;
 };
-
-type AnalyticsExportInput = {
-  exportedAt: string;
-  rangeLabel: string;
-  monthRangeLabel: string;
-  salesLabel: string;
-  clientLabel: string;
-  viewNote?: string;
-  statItems: AnalyticsStatItem[];
-  periods: string[];
-  system: number[];
-  totalTrend: { period: string; revenue: number }[];
-  multiLine: Array<{ period: string } & Record<RepKey, number>>;
-  multiLineClient: Array<{ period: string } & Partial<Record<ClientId, number>>>;
-  tableRows: RevenueBreakdownRow[];
-  viewTotal: number;
-  includeSystemTotal: boolean;
-};
-
-function buildAnalyticsExportRows(input: AnalyticsExportInput) {
-  const rows: string[][] = [
-    ['Revenue Analytics Export'],
-    ['Exported at', input.exportedAt],
-    ['Date range', input.rangeLabel],
-    ['Month range', input.monthRangeLabel],
-    ['Sales filter', input.salesLabel],
-    ['Client filter', input.clientLabel],
-  ];
-
-  if (input.viewNote) {
-    rows.push(['Note', input.viewNote]);
-  }
-
-  rows.push(
-    [],
-    ['Summary'],
-    ['Metric', 'Value', 'Note', 'Label'],
-    ...input.statItems.map((item) => [
-      item.title,
-      cellToCsv(item.valueTitle ?? item.value),
-      cellToCsv(item.note),
-      item.rightLabel ?? '',
-    ]),
-    [],
-    ['Total Revenue Trend'],
-    ['Period', 'Revenue (USD)'],
-    ...input.totalTrend.map((row) => [row.period, String(row.revenue)]),
-    [],
-    ['Individual Sales Trend'],
-    ['Period', ...REP_DEFS.map((rep) => rep.name)],
-    ...input.multiLine.map((row) => [
-      row.period,
-      ...REP_KEYS.map((key) => String(row[key])),
-    ]),
-    [],
-    ['Individual Client Trend'],
-    ['Period', ...CLIENT_DEFS.map((client) => client.name)],
-    ...input.multiLineClient.map((row) => [
-      row.period,
-      ...CLIENT_IDS.map((id) => String(row[id] ?? 0)),
-    ]),
-    [],
-    ['Revenue Breakdown'],
-    ['Sales Representative', ...input.periods, 'Grand Total'],
-    ...input.tableRows.map((row) => [
-      row.name,
-      ...row.values.map(String),
-      String(row.total),
-    ]),
-  );
-
-  if (input.includeSystemTotal) {
-    rows.push(['Revenue Total', ...input.system.map(String), String(input.viewTotal)]);
-  }
-
-  return rows;
-}
 
 type ProjectRevenueLine = { project: string; revenue: number };
 
@@ -799,15 +689,6 @@ export default function SalesRevenueAnalyticsPage() {
     [filterScopeKey, view.byRep, view.periods],
   );
 
-  const multiLineClientData = useMemo(
-    () =>
-      view.periods.map((p, i) => ({
-        period: p,
-        ...Object.fromEntries(CLIENT_IDS.map((id) => [id, view.byClient[id][i] ?? 0])),
-      })),
-    [filterScopeKey, view.byClient, view.periods],
-  );
-
   const tableRows: RevenueBreakdownRow[] = useMemo(
     () =>
       REP_DEFS.map((r) => {
@@ -1062,12 +943,7 @@ export default function SalesRevenueAnalyticsPage() {
       {
         key: 'cash',
         title: 'Cash',
-        titleInfo: (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-            <span>Paid: {money(cashBreakdown.paid)}</span>
-            <span>Unpaid: {money(cashBreakdown.unpaid)}</span>
-          </div>
-        ),
+        valueBreakdown: { paid: cashBreakdown.paid, unpaid: cashBreakdown.unpaid },
         value: `$${cashBreakdown.cash.toLocaleString('en-US')}`,
         valueVariant: 'metric',
       },
@@ -1094,58 +970,11 @@ export default function SalesRevenueAnalyticsPage() {
     [cashBreakdown, isSingleRep, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
   );
 
-  const handleExportAnalytics = useCallback(() => {
-    const salesLabel = formatSalesFilterLabel(selectedSalesKeys);
-    const clientLabel = isAllClientsSelected(selectedClientIds)
-      ? 'All Client & Projects'
-      : selectedClientIds
-          .map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id)
-          .join(', ');
-
-    const rows = buildAnalyticsExportRows({
-      exportedAt: dayjs().format('YYYY-MM-DD HH:mm'),
-      rangeLabel,
-      monthRangeLabel: formatMonthRangeLabel(monthRange),
-      salesLabel,
-      clientLabel,
-      viewNote: view.note,
-      statItems,
-      periods: view.periods,
-      system: view.system,
-      totalTrend: totalTrendData,
-      multiLine: multiLineData,
-      multiLineClient: multiLineClientData,
-      tableRows: filteredTableRows,
-      viewTotal,
-      includeSystemTotal: isAllReps,
-    });
-
-    const filename = `sales-revenue-analytics-${dayjs().format('YYYY-MM-DD')}.csv`;
-    downloadCsvFile(filename, rows);
-    message.success(`Exported ${filename}`);
-  }, [
-    filteredTableRows,
-    isAllReps,
-    monthRange,
-    multiLineData,
-    multiLineClientData,
-    rangeLabel,
-    selectedClientIds,
-    selectedSalesKeys,
-    statItems,
-    totalTrendData,
-    view.note,
-    view.periods,
-    view.system,
-    viewTotal,
-  ]);
-
   return (
     <DashboardShell selectedMenuKey="billing-dashboard">
       <div className="revenue-analytics-page">
         <div className="revenue-analytics-page__sticky">
-        <Row justify="space-between" align="middle" gutter={[16, 16]} className="revenue-analytics-page__crumb">
-          <Col flex="auto">
+        <div className="revenue-analytics-page__crumb">
             <Space size={8} align="center" wrap>
               <Link
                 to="/"
@@ -1168,17 +997,7 @@ export default function SalesRevenueAnalyticsPage() {
                 <Text style={{ color: '#1f1f1f', fontWeight: 500 }}>Revenue Analytics</Text>
               </Space>
             </Space>
-          </Col>
-          <Col>
-            <Button
-              icon={<DownloadOutlined />}
-              style={{ borderRadius: 8 }}
-              onClick={handleExportAnalytics}
-            >
-              Export Analytics Data
-            </Button>
-          </Col>
-        </Row>
+        </div>
 
         <Card
           bordered

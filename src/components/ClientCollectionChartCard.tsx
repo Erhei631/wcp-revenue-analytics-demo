@@ -279,7 +279,7 @@ function CollectionTooltip({
       <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
       <div className="collection-tooltip__divider" />
       <div className="collection-tooltip__body">
-        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} valueBold />
+        <TooltipRow label="Equity" value={money(row.equity)} valueBold />
         <div className="collection-tooltip-cash">
           <TooltipRow label="Cash" value={money(row.cash)} valueBold />
           <div className="collection-tooltip-cash__tree">

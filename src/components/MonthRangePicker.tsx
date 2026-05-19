@@ -436,7 +436,7 @@ export function MonthRangePicker({
             cursor: 'pointer',
             padding: '6px 10px',
             fontSize: 14,
-            color: '#595959',
+            color: THEME_PRIMARY,
             fontWeight: 500,
             whiteSpace: 'nowrap',
             lineHeight: 1.4,

@@ -217,11 +217,22 @@ svg {
   margin-bottom: 16px;
 }
 
+.analytics-stat-bar__section-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.analytics-stat-bar__section-wrap > span {
+  display: block;
+  height: 100%;
+}
+
 .analytics-stat-bar__section {
   position: relative;
   padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .analytics-stat-bar__divider {
@@ -243,10 +254,54 @@ svg {
   margin-bottom: 3px;
 }
 
-.analytics-stat-bar__title-info {
-  color: #bfbfbf;
-  font-size: 12px;
-  cursor: help;
+.analytics-stat-bar__section--interactive {
+  cursor: default;
+}
+
+.analytics-stat-bar-cash-tooltip .ant-tooltip-inner {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 0;
+}
+
+.analytics-stat-bar-cash-tooltip .ant-tooltip-arrow::before {
+  background: #fff !important;
+}
+
+.analytics-stat-bar__breakdown-tooltip {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+}
+
+.analytics-stat-bar__breakdown-tooltip-inner {
+  background: #eef5ff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 220px;
+}
+
+.analytics-stat-bar__breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #262626;
+}
+
+.analytics-stat-bar__breakdown-row strong {
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.analytics-stat-bar__breakdown-divider {
+  height: 1px;
+  margin: 8px 0;
+  background: #d6e4ff;
 }
 
 .analytics-stat-bar__note {
@@ -686,20 +741,29 @@ svg {
   position: sticky;
   top: 0;
   z-index: 30;
-  margin-bottom: 16px;
-  padding-bottom: 1px;
+  margin: -20px -24px 16px;
+  padding: 20px 0 0;
   background: #f4f6f9;
-  box-shadow: 0 8px 16px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 .revenue-analytics-page__crumb {
   margin-bottom: 20px !important;
+  padding: 0 24px;
 }
 
-.revenue-analytics-page__filters {
-  border-radius: 8px !important;
+.revenue-analytics-page__filters.ant-card {
+  border-radius: 10px !important;
+  margin: 0 24px !important;
   margin-bottom: 0 !important;
-  border-color: #f0f0f0 !important;
+  border: 1px solid rgba(70, 155, 255, 0.1) !important;
+  background: linear-gradient(326deg, #e3f0ff 15.72%, #fff 45.78%) !important;
+  box-shadow: 0 0 5px 0 rgba(232, 232, 232, 0.6) !important;
+  overflow: hidden;
+}
+
+.revenue-analytics-page__filters .ant-card-body {
+  background: transparent !important;
 }
 
 .revenue-analytics-page__filters-inner {
