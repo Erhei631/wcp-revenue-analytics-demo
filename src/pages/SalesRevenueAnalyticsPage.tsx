@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
+  Avatar,
   Button,
   Card,
   Col,
@@ -51,8 +52,8 @@ import {
 } from '../data/analyticsDemoSeries';
 import {
   blendFeeProfiles,
-  cashPaidFromServiceFeeTotal,
   feeProfileForClientId,
+  splitServiceFeeTotal,
 } from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
@@ -95,10 +96,34 @@ const PRESET_LABELS: Record<QuickPresetKey, string> = {
 };
 
 const REP_DEFS = [
-  { key: 'alice', name: 'Alice Chen', color: CHART_PURPLE, soft: CHART_PURPLE_SOFT },
-  { key: 'bob', name: 'Bob Li', color: CHART_GREEN, soft: CHART_GREEN_SOFT },
-  { key: 'carol', name: 'Carol Wang', color: CHART_RED, soft: CHART_RED_SOFT },
-  { key: 'david', name: 'David Park', color: CHART_BROWN, soft: CHART_BROWN_SOFT },
+  {
+    key: 'alice',
+    name: 'Alice Chen',
+    color: CHART_PURPLE,
+    soft: CHART_PURPLE_SOFT,
+    avatarUrl: '/avatars/alice-chen.jpg',
+  },
+  {
+    key: 'bob',
+    name: 'Bob Li',
+    color: CHART_GREEN,
+    soft: CHART_GREEN_SOFT,
+    avatarUrl: 'https://randomuser.me/api/portraits/men/75.jpg',
+  },
+  {
+    key: 'carol',
+    name: 'Carol Wang',
+    color: CHART_RED,
+    soft: CHART_RED_SOFT,
+    avatarUrl: 'https://randomuser.me/api/portraits/women/90.jpg',
+  },
+  {
+    key: 'david',
+    name: 'David Park',
+    color: CHART_BROWN,
+    soft: CHART_BROWN_SOFT,
+    avatarUrl: 'https://randomuser.me/api/portraits/men/52.jpg',
+  },
 ] as const;
 
 type RepKey = (typeof REP_DEFS)[number]['key'];
@@ -296,6 +321,14 @@ function buildResolvedView(
 
 function money(n: number) {
   return `$${n.toLocaleString('en-US')}`;
+}
+
+function personInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+  }
+  return (parts[0]?.slice(0, 2) ?? '—').toUpperCase();
 }
 
 function cellToCsv(value: ReactNode) {
@@ -586,13 +619,6 @@ function useTrendLegendToggle(resetKey: string) {
   return { hiddenKeys, onLegendClick, legendFormatter };
 }
 
-function repsVisibleForClients(byRep: Record<RepKey, number[]>, clientIds: ClientFilter) {
-  return REP_DEFS.filter((r) => {
-    if (isAllClientsSelected(clientIds)) return true;
-    return byRep[r.key].reduce((a, b) => a + b, 0) > 0;
-  });
-}
-
 const chartTooltipShellStyle: CSSProperties = {
   background: '#fff',
   borderRadius: 8,
@@ -676,24 +702,14 @@ function TotalRevenueTrendTooltip({
   active,
   payload,
   label,
-  periods,
-  byRep,
-  clientIds,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ value?: unknown }>;
   label?: string | number;
-  periods: string[];
-  byRep: Record<RepKey, number[]>;
-  clientIds: ClientFilter;
 }) {
   if (!active || !payload?.length) return null;
 
-  const idx = periods.indexOf(String(label ?? ''));
-  if (idx < 0) return null;
-
   const total = Number(payload[0]?.value ?? 0);
-  const visibleReps = repsVisibleForClients(byRep, clientIds);
 
   return (
     <div style={chartTooltipShellStyle}>
@@ -704,25 +720,12 @@ function TotalRevenueTrendTooltip({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 16,
-          marginBottom: visibleReps.length > 0 ? 10 : 0,
           fontSize: 13,
         }}
       >
         <span style={{ color: '#8c8c8c' }}>Total</span>
         <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{money(total)}</span>
       </div>
-      {visibleReps.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {visibleReps.map((r) => (
-            <ChartTooltipSeriesRow
-              key={r.key}
-              color={r.color}
-              name={r.name}
-              amount={byRep[r.key][idx] ?? 0}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -952,8 +955,8 @@ export default function SalesRevenueAnalyticsPage() {
     return blendFeeProfiles(ids.map((id) => feeProfileForClientId(id)));
   }, [selectedClientIds]);
 
-  const cashPaidTotal = useMemo(
-    () => cashPaidFromServiceFeeTotal(primaryTotal, feeProfileForScope),
+  const cashBreakdown = useMemo(
+    () => splitServiceFeeTotal(primaryTotal, feeProfileForScope),
     [feeProfileForScope, primaryTotal],
   );
 
@@ -961,10 +964,15 @@ export default function SalesRevenueAnalyticsPage() {
     const candidates = isAllReps
       ? tableRows
       : tableRows.filter((r) => activeSalesKeys.includes(r.key));
-    if (candidates.length === 0) return { name: '—', value: 0 };
+    if (candidates.length === 0) return { key: null as RepKey | null, name: '—', value: 0 };
     const best = candidates.reduce((a, b) => (b.total > a.total ? b : a));
-    return { name: best.name, value: best.total };
+    return { key: best.key, name: best.name, value: best.total };
   }, [activeSalesKeys, isAllReps, tableRows]);
+
+  const topRepMeta = useMemo(
+    () => (topRep.key ? REP_DEFS.find((r) => r.key === topRep.key) ?? null : null),
+    [topRep.key],
+  );
 
   const selectedRepMeta = useMemo(
     () => (isSingleRep ? REP_DEFS.find((r) => r.key === selectedSalesKeys[0]) ?? null : null),
@@ -1044,12 +1052,23 @@ export default function SalesRevenueAnalyticsPage() {
         title: 'Total Revenue',
         value: `$${primaryTotal.toLocaleString('en-US')}`,
         valueVariant: 'metric',
-        rightLabel: isAllReps ? 'Team' : 'Rep',
       },
       {
-        key: 'cash-paid',
-        title: 'Cash Paid',
-        value: `$${cashPaidTotal.toLocaleString('en-US')}`,
+        key: 'equity',
+        title: 'Equity',
+        value: `$${cashBreakdown.equity.toLocaleString('en-US')}`,
+        valueVariant: 'metric',
+      },
+      {
+        key: 'cash',
+        title: 'Cash',
+        titleInfo: (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+            <span>Paid: {money(cashBreakdown.paid)}</span>
+            <span>Unpaid: {money(cashBreakdown.unpaid)}</span>
+          </div>
+        ),
+        value: `$${cashBreakdown.cash.toLocaleString('en-US')}`,
         valueVariant: 'metric',
       },
       {
@@ -1057,11 +1076,22 @@ export default function SalesRevenueAnalyticsPage() {
         title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
         value: isSingleRep ? `${shareOfTeam ?? 0}%` : topRep.name,
         valueVariant: isSingleRep ? 'metric' : 'person',
+        avatar:
+          !isSingleRep && topRepMeta ? (
+            <Avatar
+              size={32}
+              src={topRepMeta.avatarUrl}
+              alt={topRepMeta.name}
+              style={{ flexShrink: 0, backgroundColor: topRepMeta.color }}
+            >
+              {personInitials(topRepMeta.name)}
+            </Avatar>
+          ) : undefined,
         rightLabel: isSingleRep ? money(viewTotal) : money(topRep.value),
         rightLabelTone: isSingleRep ? 'positive' : 'default',
       },
     ],
-    [cashPaidTotal, isAllReps, isSingleRep, primaryTotal, shareOfTeam, topRep, viewTotal],
+    [cashBreakdown, isSingleRep, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
   );
 
   const handleExportAnalytics = useCallback(() => {
@@ -1112,8 +1142,9 @@ export default function SalesRevenueAnalyticsPage() {
 
   return (
     <DashboardShell selectedMenuKey="billing-dashboard">
-      <div style={{ padding: '20px 24px 28px', background: '#f4f6f9', minHeight: '100%' }}>
-        <Row justify="space-between" align="middle" gutter={[16, 16]} style={{ marginBottom: 20 }}>
+      <div className="revenue-analytics-page">
+        <div className="revenue-analytics-page__sticky">
+        <Row justify="space-between" align="middle" gutter={[16, 16]} className="revenue-analytics-page__crumb">
           <Col flex="auto">
             <Space size={8} align="center" wrap>
               <Link
@@ -1151,18 +1182,10 @@ export default function SalesRevenueAnalyticsPage() {
 
         <Card
           bordered
-          style={{ borderRadius: 8, marginBottom: 16, borderColor: '#f0f0f0' }}
+          className="revenue-analytics-page__filters"
           styles={{ body: { padding: '16px 18px 14px' } }}
         >
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: 20,
-              rowGap: 14,
-            }}
-          >
+          <div className="revenue-analytics-page__filters-inner">
             <MonthRangePicker
               value={monthRange}
               activePreset={activePreset}
@@ -1200,6 +1223,7 @@ export default function SalesRevenueAnalyticsPage() {
             />
           </div>
         </Card>
+        </div>
 
         <AnalyticsStatBar items={statItems} />
 
@@ -1242,14 +1266,7 @@ export default function SalesRevenueAnalyticsPage() {
                 />
                 <RTooltip
                   content={({ active, payload, label }) => (
-                    <TotalRevenueTrendTooltip
-                      active={active}
-                      payload={payload}
-                      label={label}
-                      periods={view.periods}
-                      byRep={view.byRep}
-                      clientIds={selectedClientIds}
-                    />
+                    <TotalRevenueTrendTooltip active={active} payload={payload} label={label} />
                   )}
                 />
                 <Area

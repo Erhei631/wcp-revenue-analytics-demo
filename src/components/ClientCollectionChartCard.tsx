@@ -253,12 +253,6 @@ const chartTooltipShellStyle: CSSProperties = {
   pointerEvents: 'auto',
 };
 
-const chartTooltipDividerStyle: CSSProperties = {
-  height: 1,
-  background: '#f0f0f0',
-  margin: '10px 0',
-};
-
 function CollectionTooltip({
   active,
   payload,
@@ -279,30 +273,24 @@ function CollectionTooltip({
   const showProjectDetails = Boolean(canDrillToProjects && isClientBar && onProjectDetails);
 
   return (
-    <div style={chartTooltipShellStyle}>
-      <div
-        style={{
-          fontWeight: 600,
-          color: '#262626',
-          fontSize: 13,
-          paddingBottom: 10,
-          borderBottom: '1px solid #f0f0f0',
-        }}
-      >
-        {row.label}
+    <div style={chartTooltipShellStyle} className="collection-tooltip">
+      <div className="collection-tooltip__header">{row.label}</div>
+      <div className="collection-tooltip__divider" />
+      <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
+      <div className="collection-tooltip__divider" />
+      <div className="collection-tooltip__body">
+        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} valueBold />
+        <div className="collection-tooltip-cash">
+          <TooltipRow label="Cash" value={money(row.cash)} valueBold />
+          <div className="collection-tooltip-cash__tree">
+            <TooltipRow color={FEE_PAID} label="Paid" value={money(row.paid)} nested />
+            <TooltipRow color={FEE_UNPAID} label="Unpaid" value={money(row.unpaid)} nested />
+          </div>
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, paddingTop: 10 }}>
-        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} />
-        <div style={chartTooltipDividerStyle} />
-        <TooltipRow color={FEE_PAID} label="Cash Paid" value={money(row.paid)} />
-        <TooltipRow color={FEE_UNPAID} label="Cash Unpaid" value={money(row.unpaid)} />
-        <TooltipRow label="Cash total" value={money(row.cash)} />
-      </div>
-      <div style={chartTooltipDividerStyle} />
-      <TooltipRow label="Service Fee Total" value={money(row.serviceFeeTotal)} strong />
       {showProjectDetails ? (
         <>
-          <div style={{ ...chartTooltipDividerStyle, marginTop: 12 }} />
+          <div className="collection-tooltip__divider" />
           <Button
             type="default"
             block
@@ -311,7 +299,7 @@ function CollectionTooltip({
               e.stopPropagation();
               onProjectDetails?.(row);
             }}
-            style={{ borderRadius: 6, fontSize: 13 }}
+            className="collection-tooltip__action"
           >
             Project Details
           </Button>
@@ -324,34 +312,29 @@ function TooltipRow({
   color,
   label,
   value,
-  valueTone,
   strong,
+  valueBold,
+  nested,
 }: {
   color?: string;
   label: string;
   value: string;
-  valueTone?: 'danger';
   strong?: boolean;
+  valueBold?: boolean;
+  nested?: boolean;
 }) {
-  const valueColor = valueTone === 'danger' ? '#cf1322' : '#1f1f1f';
+  const labelWeight = strong ? 600 : 400;
+  const labelColor = strong ? '#262626' : '#595959';
+  const valueWeight = strong ? 700 : valueBold ? 600 : nested ? 400 : 600;
+  const valueColor = nested ? '#595959' : '#262626';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#595959', minWidth: 0 }}>
-        {color ? (
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 2,
-              background: color,
-              flexShrink: 0,
-            }}
-          />
-        ) : null}
-        <span style={{ fontWeight: strong ? 600 : 400, color: strong ? '#262626' : '#595959' }}>{label}</span>
+    <div className="collection-tooltip__row">
+      <span className="collection-tooltip__row-label">
+        {color ? <span className="collection-tooltip__dot" style={{ background: color }} /> : null}
+        <span style={{ fontWeight: labelWeight, color: labelColor }}>{label}</span>
       </span>
-      <span style={{ fontWeight: strong ? 700 : 600, color: valueColor, flexShrink: 0 }}>{value}</span>
+      <span style={{ fontWeight: valueWeight, color: valueColor, flexShrink: 0 }}>{value}</span>
     </div>
   );
 }
@@ -436,7 +419,7 @@ export function ClientCollectionChartCard({
       styles={{ body: { padding: '18px 18px 18px' } }}
     >
       <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {drillGroup && !drillFromFilter ? (
             <Button
               type="default"

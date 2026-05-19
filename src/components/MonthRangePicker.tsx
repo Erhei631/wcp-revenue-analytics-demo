@@ -54,7 +54,7 @@ const PRESET_SIDEBAR_SECTIONS: PresetSidebarSection[] = [
     ],
   },
   {
-    title: 'Natural Year',
+    title: 'Natural Quarter',
     items: [
       { key: 'q2_2026', label: 'Q2 2026' },
       { key: 'q1_2026', label: 'Q1 2026' },

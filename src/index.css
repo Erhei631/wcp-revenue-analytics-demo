@@ -18,6 +18,37 @@ body,
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: #f5f5f5;
+  overflow: hidden;
+}
+
+/* App shell — main content scrolls inside Content, not on body */
+.dashboard-shell {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dashboard-shell__header {
+  flex-shrink: 0;
+}
+
+.dashboard-shell__body {
+  flex: 1;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.dashboard-shell__sider {
+  height: 100%;
+  overflow: auto;
+}
+
+.dashboard-shell__content {
+  min-height: 0 !important;
+  height: 100%;
+  overflow: auto;
+  background: #f3f5f6;
 }
 
 svg {
@@ -177,7 +208,7 @@ svg {
 /* Sales analytics KPI bar */
 .analytics-stat-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   background: #fff;
   border: 1px solid #f0f0f0;
@@ -203,10 +234,19 @@ svg {
 }
 
 .analytics-stat-bar__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #595959;
   font-size: 12px;
   line-height: 1.2;
   margin-bottom: 3px;
+}
+
+.analytics-stat-bar__title-info {
+  color: #bfbfbf;
+  font-size: 12px;
+  cursor: help;
 }
 
 .analytics-stat-bar__note {
@@ -230,6 +270,21 @@ svg {
   align-items: flex-end;
   gap: 5px;
   min-width: 0;
+}
+
+.analytics-stat-bar__value-wrap--person {
+  align-items: center;
+  gap: 10px;
+}
+
+.analytics-stat-bar__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.analytics-stat-bar__avatar .ant-avatar {
+  border: 1px solid #f0f0f0;
 }
 
 .analytics-stat-bar__value {
@@ -299,7 +354,7 @@ svg {
   border: 1px solid #469bff;
   border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .analytics-revenue-by-toggle__btn {
@@ -349,7 +404,7 @@ svg {
 
 .revenue-by-client-rank__header {
   display: grid;
-  grid-template-columns: 18px minmax(180px, 1.4fr) 88px minmax(120px, 1fr) 120px;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px 120px;
   gap: 12px;
   align-items: center;
   padding: 0 8px 10px;
@@ -378,7 +433,7 @@ svg {
 
 .revenue-by-client-rank__row {
   display: grid;
-  grid-template-columns: 18px minmax(180px, 1.4fr) 88px minmax(120px, 1fr) 120px;
+  grid-template-columns: 18px minmax(180px, 1.4fr) 88px 120px;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -446,11 +501,6 @@ svg {
   letter-spacing: -0.3px;
 }
 
-.revenue-by-client-rank__col--trend {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .revenue-by-client-rank__col--change {
   display: flex;
   align-items: center;
@@ -477,10 +527,6 @@ svg {
 
 .revenue-by-client-rank__change--down {
   color: var(--rank-trend-down, #edab00);
-}
-
-.revenue-by-client-rank__sparkline {
-  display: block;
 }
 
 /* Sales revenue analytics — revenue breakdown table */
@@ -541,6 +587,127 @@ svg {
   display: flex !important;
   justify-content: center;
   gap: 12px;
+}
+
+.collection-tooltip {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.collection-tooltip__header {
+  font-weight: 600;
+  color: #262626;
+}
+
+.collection-tooltip__divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 10px 0;
+}
+
+.collection-tooltip__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-tooltip__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.collection-tooltip__row-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.collection-tooltip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.collection-tooltip-cash {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.collection-tooltip-cash__tree {
+  position: relative;
+  margin-left: 4px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collection-tooltip-cash__tree::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  bottom: 10px;
+  border-left: 1px dotted #d9d9d9;
+}
+
+.collection-tooltip-cash__tree .collection-tooltip__row {
+  position: relative;
+}
+
+.collection-tooltip-cash__tree .collection-tooltip__row::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  width: 10px;
+  border-top: 1px dotted #d9d9d9;
+}
+
+.collection-tooltip__action {
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  margin-top: 2px;
+}
+
+/* Revenue Analytics — sticky breadcrumb + filters */
+.revenue-analytics-page {
+  padding: 20px 24px 28px;
+  background: #f4f6f9;
+  min-height: 100%;
+}
+
+.revenue-analytics-page__sticky {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-bottom: 16px;
+  padding-bottom: 1px;
+  background: #f4f6f9;
+  box-shadow: 0 8px 16px -6px rgba(0, 0, 0, 0.1);
+}
+
+.revenue-analytics-page__crumb {
+  margin-bottom: 20px !important;
+}
+
+.revenue-analytics-page__filters {
+  border-radius: 8px !important;
+  margin-bottom: 0 !important;
+  border-color: #f0f0f0 !important;
+}
+
+.revenue-analytics-page__filters-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  row-gap: 14px;
 }
 
 /* Billing dashboard — Revenue Analytics toolbar button */

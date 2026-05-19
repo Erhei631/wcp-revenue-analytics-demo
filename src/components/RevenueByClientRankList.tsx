@@ -25,10 +25,6 @@ export type ClientRankRow = {
   rangeChangePct: number;
 };
 
-const SPARKLINE_WIDTH = 128;
-const SPARKLINE_HEIGHT = 28;
-const SPARKLINE_UP = 'var(--rank-trend-up, var(--theme-primary, #469bff))';
-const SPARKLINE_DOWN = CHART_RED;
 const TREND_CHART_UP = THEME_PRIMARY;
 const TREND_CHART_DOWN = CHART_RED;
 
@@ -89,7 +85,6 @@ export function RevenueByClientRankList({
         </span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--name">Name</span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--total">Total</span>
-        <span className="revenue-by-client-rank__col revenue-by-client-rank__col--trend">Trend</span>
         <span className="revenue-by-client-rank__col revenue-by-client-rank__col--change">
           Range change
           <Tooltip title="Percent change from the first to the last period in the selected range.">
@@ -132,9 +127,6 @@ export function RevenueByClientRankList({
                   <Text strong className="revenue-by-client-rank__total">
                     {formatTotalShort(row.total)}
                   </Text>
-                </div>
-                <div className="revenue-by-client-rank__col revenue-by-client-rank__col--trend">
-                  <ClientSparkline values={row.series} trendUp={trendUp} />
                 </div>
                 <div className="revenue-by-client-rank__col revenue-by-client-rank__col--change">
                   <RangeChange value={row.rangeChangePct} />
@@ -215,42 +207,3 @@ function RangeChange({ value }: { value: number }) {
   );
 }
 
-function ClientSparkline({ values, trendUp }: { values: number[]; trendUp: boolean }) {
-  if (values.length === 0) return null;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(max - min, 1);
-  const padX = 4;
-  const padY = 4;
-  const w = SPARKLINE_WIDTH;
-  const h = SPARKLINE_HEIGHT;
-  const stroke = trendUp ? SPARKLINE_UP : SPARKLINE_DOWN;
-
-  const points = values
-    .map((v, i) => {
-      const x = padX + (i / Math.max(1, values.length - 1)) * (w - padX * 2);
-      const y = h - padY - ((v - min) / span) * (h - padY * 2);
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  return (
-    <svg
-      className="revenue-by-client-rank__sparkline"
-      width={w}
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      aria-hidden
-    >
-      <polyline
-        fill="none"
-        stroke={stroke}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
-}

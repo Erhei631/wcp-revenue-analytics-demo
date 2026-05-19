@@ -19,8 +19,9 @@ const userMenu: MenuProps['items'] = [
 
 export function DashboardShell({ selectedMenuKey, children }: DashboardShellProps) {
   return (
-    <Layout style={{ minHeight: '100vh', background: '#fff' }}>
+    <Layout className="dashboard-shell">
       <Header
+        className="dashboard-shell__header"
         style={{
           position: 'relative',
           zIndex: 10,
@@ -53,13 +54,13 @@ export function DashboardShell({ selectedMenuKey, children }: DashboardShellProp
         </Space>
       </Header>
 
-      <Layout hasSider style={{ flex: 1, minHeight: 0 }}>
+      <Layout hasSider className="dashboard-shell__body">
         <Sider
           width={248}
           theme="light"
+          className="dashboard-shell__sider"
           style={{
             borderRight: '1px solid #f0f0f0',
-            overflow: 'auto',
           }}
         >
           <Menu
@@ -72,9 +73,7 @@ export function DashboardShell({ selectedMenuKey, children }: DashboardShellProp
           />
         </Sider>
 
-        <Content style={{ background: '#f3f5f6', minHeight: 'calc(100vh - 56px)', overflow: 'auto' }}>
-          {children}
-        </Content>
+        <Content className="dashboard-shell__content">{children}</Content>
       </Layout>
     </Layout>
   );
