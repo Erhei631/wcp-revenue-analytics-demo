@@ -1076,16 +1076,6 @@ export default function SalesRevenueAnalyticsPage() {
         valueVariant: 'metric',
       },
       {
-        key: 'presale-effort',
-        title: 'Presale Effort',
-        value: presaleEffort.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        unit: 'Man/Month',
-        valueVariant: 'metric',
-      },
-      {
         key: 'top-or-share',
         title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
         value: isSingleRep ? `${shareOfTeam ?? 0}%` : personFirstName(topRep.name),
@@ -1104,6 +1094,16 @@ export default function SalesRevenueAnalyticsPage() {
           ) : undefined,
         rightLabel: isSingleRep ? formatMoneyValue(viewTotal) : formatMoneyValue(topRep.value),
         rightLabelTone: isSingleRep ? 'positive' : 'default',
+      },
+      {
+        key: 'presale-effort',
+        title: 'Presale Effort',
+        value: presaleEffort.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        unit: 'Man/Month',
+        valueVariant: 'metric',
       },
     ],
     [cashBreakdown, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
