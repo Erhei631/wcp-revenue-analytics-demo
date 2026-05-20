@@ -15,11 +15,11 @@ export const NEW_LOGO_START_MONTH_INDEX: Partial<Record<DemoClientId, number>> =
   prism: 16,
 };
 
-/** New logos won in period but no project revenue yet (not started). */
-export const NEW_LOGO_NOT_STARTED_CLIENT_IDS = new Set<DemoClientId>(['nova']);
+/** New logos with a placeholder sub-project; parent and project amounts stay zero. */
+export const NEW_LOGO_ZERO_REVENUE_CLIENT_IDS = new Set<DemoClientId>(['nova']);
 
-export function isNewLogoClientNotStarted(clientId: DemoClientId): boolean {
-  return NEW_LOGO_NOT_STARTED_CLIENT_IDS.has(clientId);
+export function isNewLogoClientZeroRevenue(clientId: DemoClientId): boolean {
+  return NEW_LOGO_ZERO_REVENUE_CLIENT_IDS.has(clientId);
 }
 
 export function isNewLogoClientInRange(

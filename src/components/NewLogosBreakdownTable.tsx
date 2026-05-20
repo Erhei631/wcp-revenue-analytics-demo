@@ -2,14 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Card, Empty, Space, Table, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
-import {
-  isNewLogoClientNotStarted,
-  projectRowsForNewLogoClient,
-  type NewLogoProjectRow,
-} from '../data/newLogoDemo';
+import { projectRowsForNewLogoClient, type NewLogoProjectRow } from '../data/newLogoDemo';
 import type { DemoClientId } from '../data/demoClientCatalog';
 import { ServiceFeeBreakdownCell } from './ServiceFeeBreakdownCell';
-import { coerceAmount, formatMoney } from '../utils/moneyFormat';
+import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
 
@@ -24,7 +20,6 @@ export type NewLogoClientRow = {
   logoUrl: string;
   values: number[];
   total: number;
-  notStarted?: boolean;
 };
 
 type NoDataRow = {
@@ -60,14 +55,11 @@ type NewLogosBreakdownTableProps = {
 };
 
 function clientRowExpandable(client: NewLogoClientRow) {
-  if (client.notStarted || isNewLogoClientNotStarted(client.key)) return true;
   return projectRowsForNewLogoClient(client.key, client.values).length > 0;
 }
 
 function shouldShowNoDataOnExpand(client: NewLogoClientRow): boolean {
-  if (client.notStarted || isNewLogoClientNotStarted(client.key)) return true;
-  const projects = projectRowsForNewLogoClient(client.key, client.values);
-  return projects.length === 0 || projects.every((p) => p.total === 0);
+  return projectRowsForNewLogoClient(client.key, client.values).length === 0;
 }
 
 export function NewLogosBreakdownTable({
@@ -188,10 +180,11 @@ export function NewLogosBreakdownTable({
                 serviceFeeTotal={amount}
                 clientId={record.clientId}
                 muted
+                showZeroAmount
               />
             );
           }
-          return <Text>{formatMoney(amount)}</Text>;
+          return <Text>{formatMoneyValue(amount)}</Text>;
         },
       })),
       {
@@ -208,10 +201,11 @@ export function NewLogosBreakdownTable({
                 serviceFeeTotal={record.total}
                 clientId={record.clientId}
                 muted
+                showZeroAmount
               />
             );
           }
-          return <Text strong>{formatMoney(record.total)}</Text>;
+          return <Text strong>{formatMoneyValue(record.total)}</Text>;
         },
       },
     ];
@@ -282,11 +276,11 @@ export function NewLogosBreakdownTable({
                 </Table.Summary.Cell>
                 {periods.map((p, idx) => (
                   <Table.Summary.Cell key={p} index={idx + 1} align="right">
-                    <Text strong>{formatMoney(periodTotals[idx])}</Text>
+                    <Text strong>{formatMoneyValue(periodTotals[idx])}</Text>
                   </Table.Summary.Cell>
                 ))}
                 <Table.Summary.Cell index={periods.length + 1} align="right">
-                  <Text strong>{formatMoney(grandTotal)}</Text>
+                  <Text strong>{formatMoneyValue(grandTotal)}</Text>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
             </Table.Summary>

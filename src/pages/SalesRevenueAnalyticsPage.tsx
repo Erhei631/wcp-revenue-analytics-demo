@@ -50,7 +50,7 @@ import {
 } from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
-import { isNewLogoClientInRange, isNewLogoClientNotStarted } from '../data/newLogoDemo';
+import { isNewLogoClientInRange, isNewLogoClientZeroRevenue } from '../data/newLogoDemo';
 import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
 import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
 import {
@@ -990,8 +990,9 @@ export default function SalesRevenueAnalyticsPage() {
     })
       .map((client) => {
         const rawValues = view.byClient[client.key] ?? [];
-        const notStarted = isNewLogoClientNotStarted(client.key);
-        const values = notStarted ? rawValues.map(() => 0) : rawValues;
+        const values = isNewLogoClientZeroRevenue(client.key)
+          ? rawValues.map(() => 0)
+          : rawValues;
         const total = values.reduce((sum, value) => sum + coerceAmount(value), 0);
         return {
           key: client.key,
@@ -1000,10 +1001,8 @@ export default function SalesRevenueAnalyticsPage() {
           logoUrl: client.logoUrl,
           values,
           total,
-          notStarted,
         };
       })
-      .filter((row) => row.total > 0 || row.notStarted)
       .sort((a, b) => b.total - a.total);
   }, [
     activeSalesKeys,

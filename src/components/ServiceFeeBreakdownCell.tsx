@@ -24,6 +24,8 @@ type ServiceFeeBreakdownCellProps = {
   clientId?: DemoClientId | null;
   profile?: FeeAmountProfile;
   muted?: boolean;
+  /** When true, zero renders as $0 (and Equity/Cash $0) instead of "-". */
+  showZeroAmount?: boolean;
 };
 
 export function ServiceFeeBreakdownCell({
@@ -31,8 +33,9 @@ export function ServiceFeeBreakdownCell({
   clientId,
   profile,
   muted = false,
+  showZeroAmount = false,
 }: ServiceFeeBreakdownCellProps) {
-  if (coerceAmount(serviceFeeTotal) === 0) {
+  if (coerceAmount(serviceFeeTotal) === 0 && !showZeroAmount) {
     return <Text type="secondary">-</Text>;
   }
 
