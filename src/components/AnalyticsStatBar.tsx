@@ -54,7 +54,7 @@ function renderStatValue(item: AnalyticsStatItem) {
       ? 'analytics-stat-bar__value analytics-stat-bar__value--person'
       : 'analytics-stat-bar__value';
 
-  if (item.valueVariant === 'person' && item.valueTitle) {
+  if (item.valueTitle) {
     return (
       <Tooltip title={item.valueTitle}>
         <span className={valueClassName} tabIndex={0}>
@@ -97,7 +97,9 @@ function StatSection({ item, index }: { item: AnalyticsStatItem; index: number }
             className={
               item.avatar
                 ? 'analytics-stat-bar__value-wrap analytics-stat-bar__value-wrap--person'
-                : 'analytics-stat-bar__value-wrap'
+                : item.unit
+                  ? 'analytics-stat-bar__value-wrap analytics-stat-bar__value-wrap--with-unit'
+                  : 'analytics-stat-bar__value-wrap'
             }
           >
             {item.avatar ? <span className="analytics-stat-bar__avatar">{item.avatar}</span> : null}

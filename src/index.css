@@ -208,7 +208,7 @@ svg {
 /* Sales analytics KPI bar */
 .analytics-stat-bar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
   background: #fff;
   border: 1px solid #f0f0f0;
@@ -332,6 +332,13 @@ svg {
   gap: 10px;
 }
 
+.analytics-stat-bar__value-wrap--with-unit {
+  flex: 1;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .analytics-stat-bar__avatar {
   display: inline-flex;
   flex-shrink: 0;
@@ -351,11 +358,14 @@ svg {
 }
 
 .analytics-stat-bar__unit {
-  color: #1f1f1f;
-  font-size: 13px;
+  color: #8c8c8c;
+  font-size: 12px;
+  font-weight: 400;
   line-height: 1.1;
   margin-bottom: 4px;
+  margin-left: auto;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .analytics-stat-bar__right-label {
@@ -594,6 +604,20 @@ svg {
 .analytics-revenue-table .analytics-revenue-client-row > td {
   background: #fafafa;
   vertical-align: top;
+}
+
+.analytics-revenue-table .ant-avatar .ant-avatar-image img {
+  object-fit: contain;
+}
+
+.analytics-revenue-table .analytics-revenue-no-data-cell {
+  text-align: center !important;
+}
+
+.analytics-revenue-no-data-cell__label {
+  display: block;
+  font-size: 13px;
+  text-align: center;
 }
 
 .analytics-revenue-fee-cell {

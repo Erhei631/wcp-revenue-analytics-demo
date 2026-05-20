@@ -28,16 +28,53 @@ export type DemoClientId =
   | 'orbit'
   | 'prism';
 
+/** Real company domains for demo client logos (Clearbit). */
+const CLIENT_LOGO_DOMAIN: Record<DemoClientId, string> = {
+  acme: 'acme.com',
+  apex: 'apexsystems.com',
+  flint: 'flintgrp.com',
+  glacier: 'glacierbank.com',
+  harbor: 'harborfreight.com',
+  globex: 'globant.com',
+  bolt: 'bolt.eu',
+  edge: 'edge.com',
+  ion: 'iongroup.com',
+  jade: 'jadeglobal.com',
+  initech: 'infosys.com',
+  core: 'corelogic.com',
+  keystone: 'keystoneresorts.com',
+  lumen: 'lumen.com',
+  mosaic: 'mosaicco.com',
+  umbrella: 'umbrella.com',
+  dusk: 'docusign.com',
+  nova: 'novonordisk.com',
+  orbit: 'orbitz.com',
+  prism: 'prismhr.com',
+};
+
+/** Local or custom logo assets (override Clearbit). */
+const CLIENT_LOGO_OVERRIDE: Partial<Record<DemoClientId, string>> = {
+  dusk: '/clients/dusk-logo.png',
+  orbit: '/clients/orbit-logo.png',
+  prism: '/clients/prism-logo.png',
+  nova: '/clients/nova-logo.png',
+};
+
+export function clientLogoUrl(clientId: DemoClientId): string {
+  return CLIENT_LOGO_OVERRIDE[clientId] ?? `https://logo.clearbit.com/${CLIENT_LOGO_DOMAIN[clientId]}`;
+}
+
 export type DemoClientDef = {
   id: DemoClientId;
   name: string;
   owner: DemoRepKey;
   weight: number;
   color: string;
+  logoUrl: string;
 };
 
 /** Twenty demo clients — five per sales rep. */
-export const DEMO_CLIENT_CATALOG: DemoClientDef[] = [
+const catalogEntries: Omit<DemoClientDef, 'logoUrl'>[] = [
   { id: 'acme', name: 'Acme Corp · ERP rollout', owner: 'alice', weight: 0.24, color: CHART_PURPLE },
   { id: 'apex', name: 'Client Apex', owner: 'alice', weight: 0.2, color: '#9B7EF5' },
   { id: 'flint', name: 'Client Flint', owner: 'alice', weight: 0.19, color: '#B89CF8' },
@@ -59,6 +96,11 @@ export const DEMO_CLIENT_CATALOG: DemoClientDef[] = [
   { id: 'orbit', name: 'Client Orbit', owner: 'david', weight: 0.19, color: '#7EC3FF' },
   { id: 'prism', name: 'Client Prism', owner: 'david', weight: 0.18, color: '#4F9AE8' },
 ];
+
+export const DEMO_CLIENT_CATALOG: DemoClientDef[] = catalogEntries.map((entry) => ({
+  ...entry,
+  logoUrl: clientLogoUrl(entry.id),
+}));
 
 export const DEMO_CLIENT_IDS = DEMO_CLIENT_CATALOG.map((c) => c.id);
 

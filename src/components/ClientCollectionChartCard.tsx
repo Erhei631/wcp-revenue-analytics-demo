@@ -30,9 +30,9 @@ import type { DemoRepKey } from '../data/analyticsDemoSeries';
 
 const { Text, Title } = Typography;
 
-const FEE_EQUITY = '#FFB800';
+const FEE_EQUITY = '#57CEF4';
 const FEE_PAID = THEME_PRIMARY;
-const FEE_UNPAID = '#57CEF4';
+const FEE_UNPAID = '#FFB800';
 
 const SALES_REP_LABELS: Record<DemoRepKey, string> = {
   alice: 'Alice Chen',
@@ -273,7 +273,7 @@ function CollectionTooltip({
       <div className="collection-tooltip__body">
         <TooltipRow label="Equity" value={money(row.equity)} valueBold />
         {isProjectBar ? (
-          <TooltipRow label="Cash" value={money(row.cash)} valueBold />
+          <TooltipRow color={FEE_PAID} label="Cash" value={money(row.cash)} valueBold />
         ) : (
           <div className="collection-tooltip-cash">
             <TooltipRow label="Cash" value={money(row.cash)} valueBold />
@@ -393,9 +393,9 @@ function renderAccountOverviewBars({
         </>
       ) : (
         <>
+          <Bar dataKey="equity" name="Equity" fill={FEE_EQUITY} {...barPointerProps} />
           <Bar dataKey="paid" name="Cash Paid" fill={FEE_PAID} {...barPointerProps} />
-          <Bar dataKey="unpaid" name="Cash Unpaid" fill={FEE_UNPAID} {...barPointerProps} />
-          <Bar dataKey="equity" name="Equity" fill={FEE_EQUITY} radius={[4, 4, 0, 0]} {...barPointerProps} />
+          <Bar dataKey="unpaid" name="Cash Unpaid" fill={FEE_UNPAID} radius={[4, 4, 0, 0]} {...barPointerProps} />
         </>
       )}
     </>

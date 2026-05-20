@@ -18,8 +18,6 @@ import {
 import { Link } from 'react-router-dom';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
   Legend,
   Line,
@@ -51,6 +49,8 @@ import {
   splitServiceFeeTotal,
 } from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
+import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
+import { isNewLogoClientInRange, isNewLogoClientNotStarted } from '../data/newLogoDemo';
 import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
 import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
 import {
@@ -74,11 +74,21 @@ import {
   THEME_PRIMARY,
 } from '../constants/chartColors';
 import { DashboardShell } from '../layout/DashboardShell';
+import {
+  PRESALE_HOURS_DIVISOR,
+  presaleEffortFromHours,
+  sumPresaleHours,
+} from '../data/presaleDemoHours';
 import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
 
 const PERIODS = DEMO_PERIOD_LABELS;
+
+/** Total Revenue Trend chart colors */
+const TREND_CASH_COLOR = '#469BFF';
+const TREND_EQUITY_COLOR = '#57CEF4';
+const TREND_TOTAL_LINE_COLOR = CHART_PURPLE;
 
 const PRESET_LABELS: Record<QuickPresetKey, string> = {
   last3: 'Last 3 months',
@@ -135,7 +145,12 @@ export type ClientFilter = ClientId[];
 const CLIENTS = DEMO_CLIENT_CATALOG.map((c) => ({ id: c.id, name: c.name }));
 const CLIENT_IDS: ClientId[] = DEMO_CLIENT_IDS;
 const CLIENT_OWNER = DEMO_CLIENT_OWNER;
-const CLIENT_DEFS = DEMO_CLIENT_CATALOG.map((c) => ({ key: c.id, name: c.name, color: c.color }));
+const CLIENT_DEFS = DEMO_CLIENT_CATALOG.map((c) => ({
+  key: c.id,
+  name: c.name,
+  color: c.color,
+  logoUrl: c.logoUrl,
+}));
 
 /** Portion of the owner’s posted monthly revenue attributed to this account (rest = other deals, not listed). */
 const CLIENT_TAKE_OF_OWNER: Partial<Record<ClientId, number>> = {
@@ -321,6 +336,11 @@ function personInitials(name: string) {
     return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
   }
   return (parts[0]?.slice(0, 2) ?? '—').toUpperCase();
+}
+
+function personFirstName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts[0] ?? name;
 }
 
 const REVENUE_BREAKDOWN_NAME_COL_WIDTH = 280;
@@ -608,37 +628,44 @@ function IndividualSalesTrendTooltip({
 }
 
 
+type TotalTrendPoint = {
+  period: string;
+  revenue: number;
+  equity: number;
+  cash: number;
+};
+
 function TotalRevenueTrendTooltip({
   active,
   payload,
   label,
 }: {
   active?: boolean;
-  payload?: ReadonlyArray<{ value?: unknown }>;
+  payload?: ReadonlyArray<{ payload?: TotalTrendPoint }>;
   label?: string | number;
 }) {
   if (!active || !payload?.length) return null;
 
-  const total = Number(payload[0]?.value ?? 0);
+  const point = payload[0]?.payload;
+  if (!point) return null;
+
+  const equity = coerceAmount(point.equity);
+  const cash = coerceAmount(point.cash);
+  const total = coerceAmount(point.revenue);
 
   return (
     <div style={chartTooltipShellStyle}>
       <div style={{ fontWeight: 600, color: '#262626', marginBottom: 10, fontSize: 13 }}>{label}</div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          fontSize: 13,
-        }}
-      >
-        <span style={{ color: '#8c8c8c' }}>Total</span>
-        <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{formatMoneyValue(total)}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <ChartTooltipSeriesRow color={TREND_EQUITY_COLOR} name="Equity" amount={equity} />
+        <ChartTooltipSeriesRow color={TREND_CASH_COLOR} name="Cash" amount={cash} />
       </div>
+      <div style={{ height: 1, background: '#f0f0f0', margin: '10px 0' }} />
+      <ChartTooltipSeriesRow color={TREND_TOTAL_LINE_COLOR} name="Total Revenue" amount={total} />
     </div>
   );
 }
+
 
 type RepTableRow = RevenueBreakdownRow & { rowType: 'rep' };
 type ClientTableRow = ClientBreakdownRow & { rowType: 'client'; parentKey: RepKey };
@@ -691,11 +718,6 @@ export default function SalesRevenueAnalyticsPage() {
     legendFormatter: salesLegendFormatter,
   } = useTrendLegendToggle(`${trendLegendResetKey}|sales`);
   const primarySeries = view.system;
-
-  const totalTrendData = useMemo(
-    () => view.periods.map((p, i) => ({ period: p, revenue: primarySeries[i] ?? 0 })),
-    [primarySeries, view.periods],
-  );
 
   const multiLineData = useMemo(
     () =>
@@ -841,8 +863,6 @@ export default function SalesRevenueAnalyticsPage() {
     [expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
   );
 
-  const totalChartMax = useMemo(() => maxSeries(primarySeries), [primarySeries]);
-
   const multiChartMax = useMemo(
     () => maxPlottedRepSeries(view.byRep, activeSalesKeys, hiddenSalesTrendKeys, selectedClientIds),
     [activeSalesKeys, hiddenSalesTrendKeys, selectedClientIds, view.byRep],
@@ -870,6 +890,24 @@ export default function SalesRevenueAnalyticsPage() {
     () => splitServiceFeeTotal(primaryTotal, feeProfileForScope),
     [feeProfileForScope, primaryTotal],
   );
+
+  const totalTrendData = useMemo(
+    () =>
+      view.periods.map((p, i) => {
+        const revenue = coerceAmount(primarySeries[i]);
+        const { equity, cash } = splitServiceFeeTotal(revenue, feeProfileForScope);
+        return { period: p, revenue, equity, cash };
+      }),
+    [feeProfileForScope, primarySeries, view.periods],
+  );
+
+  const totalChartMax = useMemo(() => {
+    let max = 0;
+    for (const row of totalTrendData) {
+      max = Math.max(max, row.revenue, row.cash, row.equity);
+    }
+    return max;
+  }, [totalTrendData]);
 
   const topRep = useMemo(() => {
     const candidates = isAllReps
@@ -934,10 +972,73 @@ export default function SalesRevenueAnalyticsPage() {
     [selectedClientIds],
   );
 
-  const trendColor = THEME_PRIMARY;
+  const newLogoMonthRange = useMemo(() => {
+    const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
+      .filter(({ month }) => monthInRange(month, normalizedMonthRange))
+      .map(({ i }) => i);
+    if (indices.length === 0) return null;
+    return { startIdx: indices[0]!, endIdx: indices[indices.length - 1]! };
+  }, [normalizedMonthRange]);
+
+  const newLogoClientRows = useMemo(() => {
+    if (!newLogoMonthRange) return [];
+    const { startIdx, endIdx } = newLogoMonthRange;
+
+    return CLIENT_DEFS.filter((client) => {
+      if (!isNewLogoClientInRange(client.key, startIdx, endIdx)) return false;
+      if (!activeSalesKeys.includes(CLIENT_OWNER[client.key])) return false;
+      if (!isAllClientsSelected(selectedClientIds) && !selectedClientIds.includes(client.key)) {
+        return false;
+      }
+      return true;
+    })
+      .map((client) => {
+        const rawValues = view.byClient[client.key] ?? [];
+        const notStarted = isNewLogoClientNotStarted(client.key);
+        const values = notStarted ? rawValues.map(() => 0) : rawValues;
+        const total = values.reduce((sum, value) => sum + coerceAmount(value), 0);
+        return {
+          key: client.key,
+          name: client.name,
+          color: client.color,
+          logoUrl: client.logoUrl,
+          values,
+          total,
+          notStarted,
+        };
+      })
+      .filter((row) => row.total > 0 || row.notStarted)
+      .sort((a, b) => b.total - a.total);
+  }, [
+    activeSalesKeys,
+    newLogoMonthRange,
+    selectedClientIds,
+    view.byClient,
+  ]);
+
+  const newLogoPeriodTotals = useMemo(
+    () =>
+      view.periods.map((_, idx) =>
+        newLogoClientRows.reduce((sum, row) => sum + coerceAmount(row.values[idx]), 0),
+      ),
+    [newLogoClientRows, view.periods],
+  );
+
+  const newLogoGrandTotal = useMemo(
+    () => newLogoClientRows.reduce((sum, row) => sum + row.total, 0),
+    [newLogoClientRows],
+  );
 
   const shareOfTeam =
     isSingleRep && viewTotal > 0 ? Math.round((primaryTotal / viewTotal) * 1000) / 10 : null;
+
+  const presaleEffort = useMemo(() => {
+    const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
+      .filter(({ month }) => monthInRange(month, normalizedMonthRange))
+      .map(({ i }) => i);
+    const hours = sumPresaleHours(indices, activeSalesKeys);
+    return presaleEffortFromHours(hours);
+  }, [activeSalesKeys, normalizedMonthRange]);
 
   const salesSelectOptions = useMemo(
     () => REP_DEFS.map((r) => ({ value: r.key, label: r.name })),
@@ -952,8 +1053,6 @@ export default function SalesRevenueAnalyticsPage() {
       }),
     [],
   );
-
-  const chartFillKey = isAllReps ? 'all' : activeSalesKeys.join('-');
 
   const pillSuffix = (
     <CaretDownFilled style={{ fontSize: 9, color: '#262626', display: 'block' }} />
@@ -981,9 +1080,21 @@ export default function SalesRevenueAnalyticsPage() {
         valueVariant: 'metric',
       },
       {
+        key: 'presale-effort',
+        title: 'Presale Effort',
+        value: presaleEffort.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        unit: 'Man/Month',
+        valueVariant: 'metric',
+        valueTitle: `Presale project hours ÷ ${PRESALE_HOURS_DIVISOR}`,
+      },
+      {
         key: 'top-or-share',
         title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
-        value: isSingleRep ? `${shareOfTeam ?? 0}%` : topRep.name,
+        value: isSingleRep ? `${shareOfTeam ?? 0}%` : personFirstName(topRep.name),
+        valueTitle: isSingleRep ? undefined : topRep.name,
         valueVariant: isSingleRep ? 'metric' : 'person',
         avatar:
           !isSingleRep && topRepMeta ? (
@@ -1000,7 +1111,7 @@ export default function SalesRevenueAnalyticsPage() {
         rightLabelTone: isSingleRep ? 'positive' : 'default',
       },
     ],
-    [cashBreakdown, isSingleRep, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
+    [cashBreakdown, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
   );
 
   return (
@@ -1093,7 +1204,7 @@ export default function SalesRevenueAnalyticsPage() {
           {isAllReps ? (
             clientScopeLabel ? (
               <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-                {`Revenue for ${clientScopeLabel} — system total in this view ($) — click a data point to see project details`}
+                {`Revenue for ${clientScopeLabel} — Cash, Equity, and Total Revenue trends ($)`}
               </Text>
             ) : null
           ) : (
@@ -1103,13 +1214,7 @@ export default function SalesRevenueAnalyticsPage() {
           )}
           <div style={{ width: '100%', height: 320 }}>
             <ResponsiveContainer key={`total-${filterScopeKey}`}>
-              <AreaChart data={totalTrendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`revFill-${chartFillKey}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={trendColor} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={trendColor} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <LineChart data={totalTrendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
                 <YAxis
@@ -1124,16 +1229,35 @@ export default function SalesRevenueAnalyticsPage() {
                     <TotalRevenueTrendTooltip active={active} payload={payload} label={label} />
                   )}
                 />
-                <Area
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Line
                   type="monotone"
-                  dataKey="revenue"
-                  stroke={trendColor}
+                  dataKey="cash"
+                  name="Cash"
+                  stroke={TREND_CASH_COLOR}
                   strokeWidth={2}
-                  fill={`url(#revFill-${chartFillKey})`}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: trendColor }}
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_CASH_COLOR }}
                   activeDot={{ r: 5 }}
                 />
-              </AreaChart>
+                <Line
+                  type="monotone"
+                  dataKey="equity"
+                  name="Equity"
+                  stroke={TREND_EQUITY_COLOR}
+                  strokeWidth={2}
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_EQUITY_COLOR }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  name="Total Revenue"
+                  stroke={TREND_TOTAL_LINE_COLOR}
+                  strokeWidth={2.5}
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_TOTAL_LINE_COLOR }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </Card>
@@ -1144,9 +1268,9 @@ export default function SalesRevenueAnalyticsPage() {
           styles={{ body: { padding: '18px 18px 8px' } }}
         >
           <Title level={5} style={{ marginTop: 0, marginBottom: 12, fontWeight: 600, color: '#1f1f1f' }}>
-            Revenue by
+            Revenue By
           </Title>
-          <div className="analytics-revenue-by-toggle" role="tablist" aria-label="Revenue by view">
+          <div className="analytics-revenue-by-toggle" role="tablist" aria-label="Revenue By view">
             <button
               type="button"
               role="tab"
@@ -1253,7 +1377,7 @@ export default function SalesRevenueAnalyticsPage() {
           styles={{ body: { padding: '18px 18px 18px' } }}
         >
           <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-            Revenue breakdown
+            Revenue Breakdown
             {clientScopeLabel ? (
               <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
                 · {clientScopeLabel}
@@ -1323,6 +1447,15 @@ export default function SalesRevenueAnalyticsPage() {
           />
           </div>
         </Card>
+
+        <NewLogosBreakdownTable
+          filterScopeKey={filterScopeKey}
+          periods={view.periods}
+          clientRows={newLogoClientRows}
+          periodTotals={newLogoPeriodTotals}
+          grandTotal={newLogoGrandTotal}
+          clientScopeLabel={clientScopeLabel}
+        />
       </div>
     </DashboardShell>
   );
