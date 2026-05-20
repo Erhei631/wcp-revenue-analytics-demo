@@ -452,10 +452,28 @@ function maxSeries(values: readonly number[]) {
   return amounts.length ? Math.max(...amounts) : 0;
 }
 
-function maxChartValue(system: number[], byRep: Record<RepKey, number[]>) {
-  let max = maxSeries(system);
-  for (const k of REP_KEYS) {
-    max = Math.max(max, maxSeries(byRep[k]));
+/** Y-axis top from plotted max; small headroom, no arbitrary floor. */
+function yAxisMaxFromDataMax(dataMax: number, padding = 1.08) {
+  if (dataMax <= 0) return 100;
+  return Math.ceil(dataMax * padding);
+}
+
+function maxPlottedRepSeries(
+  byRep: Record<RepKey, number[]>,
+  salesKeys: readonly RepKey[],
+  hiddenKeys: ReadonlySet<string>,
+  clientIds: ClientFilter,
+) {
+  let max = 0;
+  for (const key of salesKeys) {
+    if (hiddenKeys.has(key)) continue;
+    const values = byRep[key];
+    if (!values?.length) continue;
+    if (!isAllClientsSelected(clientIds)) {
+      const repTotal = values.reduce((sum, value) => sum + coerceAmount(value), 0);
+      if (repTotal === 0) continue;
+    }
+    max = Math.max(max, maxSeries(values));
   }
   return max;
 }
@@ -823,14 +841,11 @@ export default function SalesRevenueAnalyticsPage() {
     [expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
   );
 
-  const totalChartMax = useMemo(
-    () => (isAllReps ? maxChartValue(view.system, view.byRep) : maxSeries(primarySeries)),
-    [isAllReps, primarySeries, view.byRep, view.system],
-  );
+  const totalChartMax = useMemo(() => maxSeries(primarySeries), [primarySeries]);
 
   const multiChartMax = useMemo(
-    () => (isAllReps ? maxChartValue(view.system, view.byRep) : maxSeries(primarySeries)),
-    [isAllReps, primarySeries, view.byRep, view.system],
+    () => maxPlottedRepSeries(view.byRep, activeSalesKeys, hiddenSalesTrendKeys, selectedClientIds),
+    [activeSalesKeys, hiddenSalesTrendKeys, selectedClientIds, view.byRep],
   );
 
   const viewTotal = useMemo(
@@ -1099,7 +1114,7 @@ export default function SalesRevenueAnalyticsPage() {
                 <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
                 <YAxis
                   tickFormatter={(v) => axisMoneyShort(Number(v))}
-                  domain={[0, Math.max(500, Math.ceil(totalChartMax * 1.12))]}
+                  domain={[0, yAxisMaxFromDataMax(totalChartMax)]}
                   tick={{ fontSize: 12 }}
                   width={56}
                   axisLine={{ stroke: '#e8e8e8' }}
@@ -1177,7 +1192,7 @@ export default function SalesRevenueAnalyticsPage() {
                   <XAxis dataKey="period" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e8e8e8' }} />
                   <YAxis
                     tickFormatter={(v) => axisMoneyShort(Number(v))}
-                    domain={[0, Math.max(500, Math.ceil(multiChartMax * 1.12))]}
+                    domain={[0, yAxisMaxFromDataMax(multiChartMax)]}
                     tick={{ fontSize: 12 }}
                     width={56}
                     axisLine={{ stroke: '#e8e8e8' }}
