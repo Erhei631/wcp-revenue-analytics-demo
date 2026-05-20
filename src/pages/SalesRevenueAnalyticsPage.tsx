@@ -74,11 +74,7 @@ import {
   THEME_PRIMARY,
 } from '../constants/chartColors';
 import { DashboardShell } from '../layout/DashboardShell';
-import {
-  PRESALE_HOURS_DIVISOR,
-  presaleEffortFromHours,
-  sumPresaleHours,
-} from '../data/presaleDemoHours';
+import { presaleEffortFromHours, sumPresaleHours } from '../data/presaleDemoHours';
 import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
@@ -1088,7 +1084,6 @@ export default function SalesRevenueAnalyticsPage() {
         }),
         unit: 'Man/Month',
         valueVariant: 'metric',
-        valueTitle: `Presale project hours ÷ ${PRESALE_HOURS_DIVISOR}`,
       },
       {
         key: 'top-or-share',
