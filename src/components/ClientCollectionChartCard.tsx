@@ -271,7 +271,7 @@ function CollectionTooltip({
       <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
       <div className="collection-tooltip__divider" />
       <div className="collection-tooltip__body">
-        <TooltipRow label="Equity" value={money(row.equity)} valueBold />
+        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} valueBold />
         {isProjectBar ? (
           <TooltipRow color={FEE_PAID} label="Cash" value={money(row.cash)} valueBold />
         ) : (
