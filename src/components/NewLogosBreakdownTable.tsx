@@ -16,6 +16,8 @@ const TOTAL_COL_WIDTH = 140;
 export type NewLogoClientRow = {
   key: DemoClientId;
   name: string;
+  /** Account owner / sales rep display name. */
+  salesName: string;
   color: string;
   logoUrl: string;
   values: number[];
@@ -140,7 +142,7 @@ export function NewLogosBreakdownTable({
           const expanded = expandedClientKeys.includes(record.key);
 
           return (
-            <Space size={10} align="center">
+            <Space size={10} align="start">
               {expandable ? (
                 <span className="analytics-revenue-expand-icon" aria-hidden>
                   {expanded ? (
@@ -160,7 +162,12 @@ export function NewLogosBreakdownTable({
               >
                 {clientInitials(name)}
               </Avatar>
-              <Text>{name}</Text>
+              <div className="analytics-revenue-client-name-block">
+                <Text className="analytics-revenue-client-name-block__title">{name}</Text>
+                <Text type="secondary" className="analytics-revenue-client-name-block__sales">
+                  {record.salesName}
+                </Text>
+              </div>
             </Space>
           );
         },

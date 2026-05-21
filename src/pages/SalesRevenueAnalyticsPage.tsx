@@ -994,9 +994,12 @@ export default function SalesRevenueAnalyticsPage() {
           ? rawValues.map(() => 0)
           : rawValues;
         const total = values.reduce((sum, value) => sum + coerceAmount(value), 0);
+        const ownerKey = CLIENT_OWNER[client.key];
+        const salesName = REP_DEFS.find((r) => r.key === ownerKey)?.name ?? '—';
         return {
           key: client.key,
           name: client.name,
+          salesName,
           color: client.color,
           logoUrl: client.logoUrl,
           values,
