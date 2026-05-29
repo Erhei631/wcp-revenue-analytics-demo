@@ -217,6 +217,10 @@ svg {
   margin-bottom: 16px;
 }
 
+.analytics-stat-bar.analytics-stat-bar--eor-only {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .analytics-stat-bar__section-wrap {
   position: relative;
   min-width: 0;
@@ -886,6 +890,34 @@ svg {
   height: 24px;
   background: #e8e8e8;
   flex-shrink: 0;
+}
+
+.revenue-analytics-page__eor-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.revenue-analytics-page__eor-filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #262626;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.revenue-analytics-page__eor-filter .ant-switch.ant-switch-checked {
+  background: var(--theme-primary, #469bff);
+}
+
+.eor-project-tag.ant-tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding-inline: 6px;
+  border-radius: 4px;
 }
 
 .month-range-picker__trigger {

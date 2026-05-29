@@ -2,8 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Card, Empty, Space, Table, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
-import { projectRowsForNewLogoClient, type NewLogoProjectRow } from '../data/newLogoDemo';
+import { clientHasEorProject } from '../data/collectionClientDemo';
+import {
+  isNewLogoEorDemoClient,
+  projectRowsForNewLogoClient,
+  projectsForNewLogoClient,
+  type NewLogoProjectRow,
+} from '../data/newLogoDemo';
 import type { DemoClientId } from '../data/demoClientCatalog';
+import { EorProjectTag } from './EorProjectTag';
 import { ServiceFeeBreakdownCell } from './ServiceFeeBreakdownCell';
 import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
 
@@ -54,14 +61,28 @@ type NewLogosBreakdownTableProps = {
   periodTotals: number[];
   grandTotal: number;
   clientScopeLabel?: string | null;
+  /** EOR projects: revenue only, no Equity / Cash breakdown. */
+  revenueOnly?: boolean;
 };
 
-function clientRowExpandable(client: NewLogoClientRow) {
-  return projectRowsForNewLogoClient(client.key, client.values).length > 0;
+function projectRowsForDisplay(client: NewLogoClientRow, eorOnly: boolean) {
+  const rows = projectRowsForNewLogoClient(client.key, client.values);
+  if (!eorOnly) return rows;
+  return rows.filter((row) => row.eor);
 }
 
-function shouldShowNoDataOnExpand(client: NewLogoClientRow): boolean {
-  return projectRowsForNewLogoClient(client.key, client.values).length === 0;
+function clientHasEorProjects(client: NewLogoClientRow) {
+  const hasEorProject = projectsForNewLogoClient(client.key).some((p) => p.eor);
+  if (isNewLogoEorDemoClient(client.key)) return hasEorProject;
+  return clientHasEorProject(client.key) && hasEorProject;
+}
+
+function clientRowExpandable(client: NewLogoClientRow, eorOnly: boolean) {
+  return projectRowsForDisplay(client, eorOnly).length > 0;
+}
+
+function shouldShowNoDataOnExpand(client: NewLogoClientRow, eorOnly: boolean) {
+  return projectRowsForDisplay(client, eorOnly).length === 0;
 }
 
 export function NewLogosBreakdownTable({
@@ -71,6 +92,7 @@ export function NewLogosBreakdownTable({
   periodTotals,
   grandTotal,
   clientScopeLabel,
+  revenueOnly = false,
 }: NewLogosBreakdownTableProps) {
   const [expandedClientKeys, setExpandedClientKeys] = useState<DemoClientId[]>([]);
 
@@ -84,21 +106,26 @@ export function NewLogosBreakdownTable({
     );
   }, []);
 
+  const visibleClientRows = useMemo(() => {
+    if (!revenueOnly) return clientRows;
+    return clientRows.filter(clientHasEorProjects);
+  }, [clientRows, revenueOnly]);
+
   const displayRows = useMemo<DisplayRow[]>(() => {
     const rows: DisplayRow[] = [];
-    for (const client of clientRows) {
+    for (const client of visibleClientRows) {
       rows.push({ ...client, rowType: 'client' });
       if (!expandedClientKeys.includes(client.key)) continue;
-      if (shouldShowNoDataOnExpand(client)) {
+      if (shouldShowNoDataOnExpand(client, revenueOnly)) {
         rows.push({ rowType: 'no-data', key: `${client.key}::no-data`, parentKey: client.key });
         continue;
       }
-      for (const project of projectRowsForNewLogoClient(client.key, client.values)) {
+      for (const project of projectRowsForDisplay(client, revenueOnly)) {
         rows.push({ ...project, rowType: 'project', parentKey: client.key });
       }
     }
     return rows;
-  }, [clientRows, expandedClientKeys]);
+  }, [expandedClientKeys, revenueOnly, visibleClientRows]);
 
   const scrollX = NAME_COL_WIDTH + periods.length * PERIOD_COL_WIDTH + TOTAL_COL_WIDTH;
   const columnCount = periods.length + 2;
@@ -129,16 +156,19 @@ export function NewLogosBreakdownTable({
 
           if (record.rowType === 'project') {
             return (
-              <Text
-                type="secondary"
-                style={{ display: 'block', paddingLeft: PROJECT_NAME_INDENT, fontSize: 13 }}
+              <Space
+                size={6}
+                align="center"
+                style={{ display: 'flex', paddingLeft: PROJECT_NAME_INDENT, fontSize: 13 }}
+                wrap
               >
-                {name}
-              </Text>
+                <Text type="secondary">{name}</Text>
+                {record.eor ? <EorProjectTag /> : null}
+              </Space>
             );
           }
 
-          const expandable = clientRowExpandable(record);
+          const expandable = clientRowExpandable(record, revenueOnly);
           const expanded = expandedClientKeys.includes(record.key);
 
           return (
@@ -188,6 +218,7 @@ export function NewLogosBreakdownTable({
                 clientId={record.clientId}
                 muted
                 showZeroAmount
+                revenueOnly={revenueOnly}
               />
             );
           }
@@ -209,6 +240,7 @@ export function NewLogosBreakdownTable({
                 clientId={record.clientId}
                 muted
                 showZeroAmount
+                revenueOnly={revenueOnly}
               />
             );
           }
@@ -217,7 +249,7 @@ export function NewLogosBreakdownTable({
       },
     ];
     },
-    [columnCount, expandedClientKeys, periods],
+    [columnCount, expandedClientKeys, periods, revenueOnly],
   );
 
   return (
@@ -228,7 +260,11 @@ export function NewLogosBreakdownTable({
     >
       <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
         New Logos
-        {clientScopeLabel ? (
+        {revenueOnly ? (
+          <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
+            · EOR projects only
+          </Text>
+        ) : clientScopeLabel ? (
           <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
             · {clientScopeLabel}
           </Text>
@@ -246,12 +282,12 @@ export function NewLogosBreakdownTable({
             if (record.rowType === 'project' || record.rowType === 'no-data') {
               return 'analytics-revenue-client-row';
             }
-            return clientRowExpandable(record)
+            return clientRowExpandable(record, revenueOnly)
               ? 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
               : 'analytics-revenue-rep-row';
           }}
           onRow={(record) => {
-            if (record.rowType !== 'client' || !clientRowExpandable(record)) {
+            if (record.rowType !== 'client' || !clientRowExpandable(record, revenueOnly)) {
               return {};
             }
             const expanded = expandedClientKeys.includes(record.key);
@@ -271,7 +307,11 @@ export function NewLogosBreakdownTable({
             emptyText: (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No new logos in this period for the current filters."
+                description={
+                  revenueOnly
+                    ? 'No EOR new-logo projects in this period for the current filters.'
+                    : 'No new logos in this period for the current filters.'
+                }
               />
             ),
           }}

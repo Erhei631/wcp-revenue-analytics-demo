@@ -18,6 +18,36 @@ export const NEW_LOGO_START_MONTH_INDEX: Partial<Record<DemoClientId, number>> =
 /** New logos with a placeholder sub-project; parent and project amounts stay zero. */
 export const NEW_LOGO_ZERO_REVENUE_CLIENT_IDS = new Set<DemoClientId>(['nova']);
 
+/** Shown in New Logos when the EOR filter is on (demo). */
+export const NEW_LOGO_EOR_DEMO_CLIENT_IDS = new Set<DemoClientId>(['dusk', 'orbit']);
+
+/**
+ * EOR-only monthly revenue by global DEMO_MONTHS index (Jan 2025 = 0).
+ * Values are non-zero only after the client’s logo start month.
+ */
+const NEW_LOGO_EOR_DEMO_BY_MONTH: Partial<Record<DemoClientId, readonly number[]>> = {
+  dusk: [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 420, 680, 540, 610,
+  ],
+  orbit: [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 980, 1_180,
+  ],
+};
+
+export function isNewLogoEorDemoClient(clientId: DemoClientId): boolean {
+  return NEW_LOGO_EOR_DEMO_CLIENT_IDS.has(clientId);
+}
+
+export function newLogoEorDemoValues(
+  clientId: DemoClientId,
+  rangeStartIdx: number,
+  rangeEndIdx: number,
+): number[] {
+  const series = NEW_LOGO_EOR_DEMO_BY_MONTH[clientId];
+  if (!series) return [];
+  return series.slice(rangeStartIdx, rangeEndIdx + 1).map((v) => v ?? 0);
+}
+
 export function isNewLogoClientZeroRevenue(clientId: DemoClientId): boolean {
   return NEW_LOGO_ZERO_REVENUE_CLIENT_IDS.has(clientId);
 }
@@ -57,7 +87,7 @@ function buildNewLogoProjects(clientId: DemoClientId): CollectionProjectDef[] {
 
   return [
     { key: `${clientId}-p1`, name: primary, weight: 0.65 },
-    { key: `${clientId}-p2`, name: 'Implementation', weight: 0.35 },
+    { key: `${clientId}-p2`, name: 'Implementation', weight: 0.35, eor: true },
   ];
 }
 
@@ -104,6 +134,7 @@ export type NewLogoProjectRow = {
   values: number[];
   total: number;
   clientId: DemoClientId;
+  eor?: boolean;
 };
 
 export function projectRowsForNewLogoClient(
@@ -124,6 +155,7 @@ export function projectRowsForNewLogoClient(
       values: childValues,
       total: childValues.reduce((sum, value) => sum + value, 0),
       clientId,
+      eor: proj.eor,
     };
   });
 }

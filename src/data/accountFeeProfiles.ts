@@ -62,10 +62,20 @@ export function cashPaidFromServiceFeeTotal(
   return splitServiceFeeTotal(serviceFeeTotal, profile).paid;
 }
 
+/** EOR projects are tracked as revenue only — no Equity / Cash fee split. */
+export function revenueOnlyBreakdown(revenue: number): ServiceFeeBreakdown {
+  const total = Math.max(0, Math.round(revenue));
+  return { serviceFeeTotal: total, equity: 0, cash: 0, paid: 0, unpaid: 0 };
+}
+
 export function splitServiceFeeTotal(
   serviceFeeTotal: number,
   profile: FeeAmountProfile = DEFAULT_FEE_PROFILE,
+  revenueOnly = false,
 ): ServiceFeeBreakdown {
+  if (revenueOnly) {
+    return revenueOnlyBreakdown(serviceFeeTotal);
+  }
   if (serviceFeeTotal <= 0) {
     return { serviceFeeTotal: 0, equity: 0, cash: 0, paid: 0, unpaid: 0 };
   }

@@ -5,6 +5,7 @@ import {
   Empty,
   Select,
   Space,
+  Switch,
   Table,
   Typography,
 } from 'antd';
@@ -49,8 +50,16 @@ import {
   splitServiceFeeTotal,
 } from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
+import { EorProjectTag } from '../components/EorProjectTag';
+import { COLLECTION_CLIENT_GROUPS } from '../data/collectionClientDemo';
 import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
-import { isNewLogoClientInRange, isNewLogoClientZeroRevenue } from '../data/newLogoDemo';
+import {
+  isNewLogoClientInRange,
+  isNewLogoClientZeroRevenue,
+  isNewLogoEorDemoClient,
+  newLogoEorDemoValues,
+  projectsForNewLogoClient,
+} from '../data/newLogoDemo';
 import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
 import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
 import {
@@ -75,6 +84,13 @@ import {
 } from '../constants/chartColors';
 import { DashboardShell } from '../layout/DashboardShell';
 import { presaleEffortFromHours, sumPresaleHours } from '../data/presaleDemoHours';
+import {
+  eorRevenueFractionForClient,
+  isClientInEorScope,
+  isEorProjectName,
+  projectsForRevenueScope,
+  scaleAmountForEor,
+} from '../data/eorProjectDemo';
 import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
@@ -205,41 +221,55 @@ function isAllSalesSelected(salesKeys: SalesFilter) {
   return salesKeys.length === 0 || salesKeys.length === REP_KEYS.length;
 }
 
-function monthlyByRepForClients(clientIds: ClientFilter): Record<RepKey, number[]> {
-  if (isAllClientsSelected(clientIds)) {
+function monthlyByRepForClients(
+  clientIds: ClientFilter,
+  eorOnly: boolean,
+): Record<RepKey, number[]> {
+  if (!eorOnly && isAllClientsSelected(clientIds)) {
     return Object.fromEntries(REP_KEYS.map((k) => [k, [...BREAKDOWN[k]]])) as Record<RepKey, number[]>;
   }
 
   const merged = Object.fromEntries(
     REP_KEYS.map((k) => [k, PERIODS.map(() => 0)]),
   ) as Record<RepKey, number[]>;
+  const idsToInclude = isAllClientsSelected(clientIds) ? CLIENT_IDS : clientIds;
 
-  for (const id of clientIds) {
+  for (const id of idsToInclude) {
     const owner = CLIENT_OWNER[id];
+    const scale = eorOnly ? eorRevenueFractionForClient(id) : 1;
     for (let i = 0; i < PERIODS.length; i++) {
-      merged[owner][i] += coerceAmount(CLIENT_MONTHLY_BASE[id][i]);
+      merged[owner][i] += scaleAmountForEor(CLIENT_MONTHLY_BASE[id][i], scale);
     }
   }
 
   return merged;
 }
 
-function monthlyByClientForClients(clientIds: ClientFilter): Record<ClientId, number[]> {
+function monthlyByClientForClients(
+  clientIds: ClientFilter,
+  eorOnly: boolean,
+): Record<ClientId, number[]> {
   return Object.fromEntries(
     CLIENT_IDS.map((id) => {
       const values = [...CLIENT_MONTHLY_BASE[id]];
-      if (isAllClientsSelected(clientIds) || clientIds.includes(id)) {
-        return [id, values];
+      if (!isAllClientsSelected(clientIds) && !clientIds.includes(id)) {
+        return [id, PERIODS.map(() => 0)];
       }
-      return [id, PERIODS.map(() => 0)];
+      const scale = eorOnly ? eorRevenueFractionForClient(id) : 1;
+      return [id, values.map((v) => scaleAmountForEor(v, scale))];
     }),
   ) as Record<ClientId, number[]>;
 }
 
-function clientFilterNote(clientIds: ClientFilter): string | undefined {
-  if (isAllClientsSelected(clientIds)) return undefined;
-  const labels = clientIds.map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id);
-  return `Client / project: ${labels.join(', ')} (demo)`;
+function clientFilterNote(clientIds: ClientFilter, eorOnly: boolean): string | undefined {
+  const parts: string[] = [];
+  if (eorOnly) parts.push('EOR projects only');
+  if (!isAllClientsSelected(clientIds)) {
+    const labels = clientIds.map((id) => CLIENTS.find((c) => c.id === id)?.name ?? id);
+    parts.push(`Client / project: ${labels.join(', ')}`);
+  }
+  if (parts.length === 0) return undefined;
+  return `${parts.join(' · ')} (demo)`;
 }
 
 function formatClientScopeLabel(clientIds: ClientFilter): string | null {
@@ -294,10 +324,11 @@ function buildResolvedView(
   clientIds: ClientFilter,
   salesKeys: SalesFilter,
   rangeLabel: string,
+  eorOnly: boolean,
 ): BuiltView {
-  const monthly = monthlyByRepForClients(clientIds);
-  const monthlyClients = monthlyByClientForClients(clientIds);
-  const baseNote = clientFilterNote(clientIds);
+  const monthly = monthlyByRepForClients(clientIds, eorOnly);
+  const monthlyClients = monthlyByClientForClients(clientIds, eorOnly);
+  const baseNote = clientFilterNote(clientIds, eorOnly);
   const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
     .filter(({ month }) => monthInRange(month, range))
     .map(({ i }) => i);
@@ -351,64 +382,75 @@ type RevenueBreakdownRow = {
   total: number;
 };
 
-type ProjectRevenueLine = { project: string; revenue: number };
+type ProjectRevenueLine = { project: string; revenue: number; eor?: boolean };
 
 /** Demo project splits per rep (weights sum to 1). */
-const REP_PROJECT_SPLITS: Record<RepKey, readonly { name: string; weight: number }[]> = {
+const REP_PROJECT_SPLITS: Record<RepKey, readonly { name: string; weight: number; eor?: boolean }[]> = {
   alice: [
     { name: 'Acme Corp · ERP rollout', weight: 0.58 },
-    { name: 'Northwind SaaS', weight: 0.42 },
+    { name: 'Northwind SaaS', weight: 0.42, eor: true },
   ],
   bob: [
     { name: 'Globex · Data platform', weight: 0.62 },
-    { name: 'Contoso Analytics', weight: 0.38 },
+    { name: 'Contoso Analytics', weight: 0.38, eor: true },
   ],
   carol: [
     { name: 'Initech · Billing integration', weight: 0.55 },
-    { name: 'Fabrikam Support', weight: 0.45 },
+    { name: 'Fabrikam Support', weight: 0.45, eor: true },
   ],
   david: [
     { name: 'Umbrella · Mobile app', weight: 0.52 },
-    { name: 'Tailspin IoT', weight: 0.48 },
+    { name: 'Tailspin IoT', weight: 0.48, eor: true },
   ],
 };
 
 function splitAmountByProjects(
   amount: number,
-  projects: readonly { name: string; weight: number }[],
+  projects: readonly { name: string; weight: number; eor?: boolean }[],
 ): ProjectRevenueLine[] {
+  if (projects.length === 0) return [];
   if (amount <= 0) {
-    return projects.map((p) => ({ project: p.name, revenue: 0 }));
+    return projects.map((p) => ({ project: p.name, revenue: 0, eor: p.eor }));
   }
   const totalWeight = projects.reduce((s, p) => s + p.weight, 0);
   let remaining = amount;
   return projects.map((p, i) => {
     if (i === projects.length - 1) {
-      return { project: p.name, revenue: remaining };
+      return { project: p.name, revenue: remaining, eor: p.eor };
     }
     const share = Math.round((amount * p.weight) / totalWeight);
     remaining -= share;
-    return { project: p.name, revenue: share };
+    return { project: p.name, revenue: share, eor: p.eor };
   });
 }
 
-function breakdownForCell(repKey: RepKey, amount: number, clientIds: ClientFilter): ProjectRevenueLine[] {
+function breakdownForCell(
+  repKey: RepKey,
+  amount: number,
+  clientIds: ClientFilter,
+  eorOnly: boolean,
+): ProjectRevenueLine[] {
   if (amount === 0) return [];
   if (isAllClientsSelected(clientIds)) {
-    return splitAmountByProjects(amount, REP_PROJECT_SPLITS[repKey]);
+    const projects = projectsForRevenueScope(REP_PROJECT_SPLITS[repKey], eorOnly);
+    return splitAmountByProjects(amount, projects);
   }
 
   const owned = clientIds.filter((id) => CLIENT_OWNER[id] === repKey);
   if (owned.length === 0) return [];
   if (owned.length === 1) {
-    const client = CLIENTS.find((c) => c.id === owned[0]);
-    return [{ project: client?.name ?? owned[0], revenue: amount }];
+    const clientId = owned[0]!;
+    if (eorOnly && eorRevenueFractionForClient(clientId) <= 0) return [];
+    const client = CLIENTS.find((c) => c.id === clientId);
+    return [{ project: client?.name ?? clientId, revenue: amount }];
   }
 
-  const projects = owned.map((id) => ({
-    name: CLIENTS.find((c) => c.id === id)?.name ?? id,
-    weight: CLIENT_TAKE_OF_OWNER[id] ?? 1,
-  }));
+  const projects = owned
+    .filter((id) => !eorOnly || eorRevenueFractionForClient(id) > 0)
+    .map((id) => ({
+      name: CLIENTS.find((c) => c.id === id)?.name ?? id,
+      weight: CLIENT_TAKE_OF_OWNER[id] ?? 1,
+    }));
   return splitAmountByProjects(amount, projects);
 }
 
@@ -416,14 +458,21 @@ function breakdownForRowTotal(
   repKey: RepKey,
   values: number[],
   clientIds: ClientFilter,
+  eorOnly: boolean,
 ): ProjectRevenueLine[] {
   const totals = new Map<string, number>();
+  const eorByProject = new Map<string, boolean>();
   values.forEach((amount) => {
-    breakdownForCell(repKey, amount, clientIds).forEach(({ project, revenue }) => {
+    breakdownForCell(repKey, amount, clientIds, eorOnly).forEach(({ project, revenue, eor }) => {
       totals.set(project, (totals.get(project) ?? 0) + revenue);
+      if (eor) eorByProject.set(project, true);
     });
   });
-  return [...totals.entries()].map(([project, revenue]) => ({ project, revenue }));
+  return [...totals.entries()].map(([project, revenue]) => ({
+    project,
+    revenue,
+    eor: eorByProject.get(project),
+  }));
 }
 
 type ClientBreakdownRow = {
@@ -432,28 +481,32 @@ type ClientBreakdownRow = {
   values: number[];
   total: number;
   clientId?: ClientId;
+  eor?: boolean;
 };
 
 function clientRowsForRep(
   repKey: RepKey,
   values: number[],
   clientIds: ClientFilter,
+  eorOnly: boolean,
 ): ClientBreakdownRow[] {
-  const lines = breakdownForRowTotal(repKey, values, clientIds);
+  const lines = breakdownForRowTotal(repKey, values, clientIds, eorOnly);
   if (lines.length === 0) return [];
 
-  return lines.map(({ project }) => {
+  return lines.map(({ project, eor: lineEor }) => {
     const childValues = values.map((amount) => {
-      const cellLines = breakdownForCell(repKey, amount, clientIds);
+      const cellLines = breakdownForCell(repKey, amount, clientIds, eorOnly);
       return cellLines.find((line) => line.project === project)?.revenue ?? 0;
     });
     const matchedClient = CLIENTS.find((c) => c.name === project);
+    const clientId = matchedClient?.id;
     return {
       key: `${repKey}::${project}`,
       name: project,
       values: childValues,
       total: childValues.reduce((a, b) => a + coerceAmount(b), 0),
-      clientId: matchedClient?.id,
+      clientId,
+      eor: lineEor ?? isEorProjectName(project, clientId),
     };
   });
 }
@@ -635,19 +688,31 @@ function TotalRevenueTrendTooltip({
   active,
   payload,
   label,
+  revenueOnly = false,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ payload?: TotalTrendPoint }>;
   label?: string | number;
+  revenueOnly?: boolean;
 }) {
   if (!active || !payload?.length) return null;
 
   const point = payload[0]?.payload;
   if (!point) return null;
 
+  const total = coerceAmount(point.revenue);
+
+  if (revenueOnly) {
+    return (
+      <div style={chartTooltipShellStyle}>
+        <div style={{ fontWeight: 600, color: '#262626', marginBottom: 10, fontSize: 13 }}>{label}</div>
+        <ChartTooltipSeriesRow color={TREND_TOTAL_LINE_COLOR} name="Revenue" amount={total} />
+      </div>
+    );
+  }
+
   const equity = coerceAmount(point.equity);
   const cash = coerceAmount(point.cash);
-  const total = coerceAmount(point.revenue);
 
   return (
     <div style={chartTooltipShellStyle}>
@@ -672,8 +737,8 @@ function clientIdForDisplayRow(record: DisplayRow): ClientId | undefined {
   return record.clientId ?? CLIENTS.find((c) => c.name === record.name)?.id;
 }
 
-function repRowExpandable(record: RepTableRow, selectedClientIds: ClientFilter) {
-  return clientRowsForRep(record.key, record.values, selectedClientIds).length > 0;
+function repRowExpandable(record: RepTableRow, selectedClientIds: ClientFilter, eorOnly: boolean) {
+  return clientRowsForRep(record.key, record.values, selectedClientIds, eorOnly).length > 0;
 }
 
 export default function SalesRevenueAnalyticsPage() {
@@ -681,14 +746,18 @@ export default function SalesRevenueAnalyticsPage() {
   const [activePreset, setActivePreset] = useState<QuickPresetKey | null>('ytd');
   const [selectedSalesKeys, setSelectedSalesKeys] = useState<SalesFilter>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<ClientFilter>([]);
+  const [eorOnly, setEorOnly] = useState(false);
   const [expandedRepKeys, setExpandedRepKeys] = useState<RepKey[]>([]);
-  const [revenueTrendView, setRevenueTrendView] = useState<'sales' | 'client'>('sales');
+  const [revenueTrendView, setRevenueTrendView] = useState<'sales' | 'client'>(() => {
+    const trend = new URLSearchParams(window.location.search).get('trend');
+    return trend === 'client' ? 'client' : 'sales';
+  });
 
   const normalizedMonthRange = useMemo(() => normalizeMonthRange(monthRange), [monthRange]);
   const rangeLabel = activePreset ? PRESET_LABELS[activePreset] : formatMonthRangeLabel(normalizedMonthRange);
   const monthStartKey = normalizedMonthRange.start.format('YYYY-MM');
   const monthEndKey = normalizedMonthRange.end.format('YYYY-MM');
-  const filterScopeKey = `${monthStartKey}|${monthEndKey}|${selectedClientIds.join(',')}|${selectedSalesKeys.join(',')}`;
+  const filterScopeKey = `${monthStartKey}|${monthEndKey}|${selectedClientIds.join(',')}|${selectedSalesKeys.join(',')}|eor:${eorOnly}`;
 
   const view = useMemo(
     () =>
@@ -697,8 +766,9 @@ export default function SalesRevenueAnalyticsPage() {
         selectedClientIds,
         selectedSalesKeys,
         rangeLabel,
+        eorOnly,
       ),
-    [monthEndKey, monthStartKey, rangeLabel, selectedClientIds, selectedSalesKeys],
+    [eorOnly, monthEndKey, monthStartKey, rangeLabel, selectedClientIds, selectedSalesKeys],
   );
 
   const isAllReps = isAllSalesSelected(selectedSalesKeys);
@@ -758,12 +828,12 @@ export default function SalesRevenueAnalyticsPage() {
     for (const rep of filteredTableRows) {
       rows.push({ ...rep, rowType: 'rep' });
       if (!expandedRepKeys.includes(rep.key)) continue;
-      for (const client of clientRowsForRep(rep.key, rep.values, selectedClientIds)) {
+      for (const client of clientRowsForRep(rep.key, rep.values, selectedClientIds, eorOnly)) {
         rows.push({ ...client, rowType: 'client', parentKey: rep.key });
       }
     }
     return rows;
-  }, [expandedRepKeys, filteredTableRows, selectedClientIds]);
+  }, [eorOnly, expandedRepKeys, filteredTableRows, selectedClientIds]);
 
   const revenueTableScrollX = useMemo(
     () =>
@@ -783,13 +853,19 @@ export default function SalesRevenueAnalyticsPage() {
         render: (name: string, record) => {
           if (record.rowType === 'client') {
             return (
-              <Text type="secondary" style={{ display: 'block', paddingLeft: 34, fontSize: 13 }}>
-                {name}
-              </Text>
+              <Space
+                size={6}
+                align="center"
+                style={{ display: 'flex', paddingLeft: 34, fontSize: 13 }}
+                wrap
+              >
+                <Text type="secondary">{name}</Text>
+                {record.eor ? <EorProjectTag /> : null}
+              </Space>
             );
           }
 
-          const expandable = repRowExpandable(record, selectedClientIds);
+          const expandable = repRowExpandable(record, selectedClientIds, eorOnly);
           const expanded = expandedRepKeys.includes(record.key);
 
           return (
@@ -831,6 +907,7 @@ export default function SalesRevenueAnalyticsPage() {
                 serviceFeeTotal={amount}
                 clientId={clientIdForDisplayRow(record)}
                 muted
+                revenueOnly={eorOnly}
               />
             );
           }
@@ -849,6 +926,7 @@ export default function SalesRevenueAnalyticsPage() {
                 serviceFeeTotal={record.total}
                 clientId={clientIdForDisplayRow(record)}
                 muted
+                revenueOnly={eorOnly}
               />
             );
           }
@@ -856,7 +934,7 @@ export default function SalesRevenueAnalyticsPage() {
         },
       },
     ],
-    [expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
+    [eorOnly, expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
   );
 
   const multiChartMax = useMemo(
@@ -883,27 +961,30 @@ export default function SalesRevenueAnalyticsPage() {
   }, [selectedClientIds]);
 
   const cashBreakdown = useMemo(
-    () => splitServiceFeeTotal(primaryTotal, feeProfileForScope),
-    [feeProfileForScope, primaryTotal],
+    () => splitServiceFeeTotal(primaryTotal, feeProfileForScope, eorOnly),
+    [eorOnly, feeProfileForScope, primaryTotal],
   );
 
   const totalTrendData = useMemo(
     () =>
       view.periods.map((p, i) => {
         const revenue = coerceAmount(primarySeries[i]);
+        if (eorOnly) {
+          return { period: p, revenue, equity: 0, cash: 0 };
+        }
         const { equity, cash } = splitServiceFeeTotal(revenue, feeProfileForScope);
         return { period: p, revenue, equity, cash };
       }),
-    [feeProfileForScope, primarySeries, view.periods],
+    [eorOnly, feeProfileForScope, primarySeries, view.periods],
   );
 
   const totalChartMax = useMemo(() => {
     let max = 0;
     for (const row of totalTrendData) {
-      max = Math.max(max, row.revenue, row.cash, row.equity);
+      max = eorOnly ? Math.max(max, row.revenue) : Math.max(max, row.revenue, row.cash, row.equity);
     }
     return max;
-  }, [totalTrendData]);
+  }, [eorOnly, totalTrendData]);
 
   const topRep = useMemo(() => {
     const candidates = isAllReps
@@ -932,6 +1013,7 @@ export default function SalesRevenueAnalyticsPage() {
   const clientRankRows = useMemo(
     () =>
       visibleClientTrendDefs
+        .filter((client) => !eorOnly || isClientInEorScope(client.key))
         .map((client) => {
           const raw = view.byClient[client.key] ?? [];
           const total = raw.reduce((sum, value) => sum + value, 0);
@@ -960,13 +1042,19 @@ export default function SalesRevenueAnalyticsPage() {
             rangeChangePct: computeRangeChangePct(series),
           };
         }),
-    [filterScopeKey, visibleClientTrendDefs, view.byClient],
+    [eorOnly, filterScopeKey, visibleClientTrendDefs, view.byClient],
   );
 
   const clientScopeLabel = useMemo(
     () => formatClientScopeLabel(selectedClientIds),
     [selectedClientIds],
   );
+
+  const collectionDrillKey = useMemo(() => {
+    const drill = new URLSearchParams(window.location.search).get('drill');
+    if (!drill) return null;
+    return COLLECTION_CLIENT_GROUPS.some((g) => g.key === drill) ? drill : null;
+  }, []);
 
   const newLogoMonthRange = useMemo(() => {
     const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
@@ -990,9 +1078,12 @@ export default function SalesRevenueAnalyticsPage() {
     })
       .map((client) => {
         const rawValues = view.byClient[client.key] ?? [];
-        const values = isNewLogoClientZeroRevenue(client.key)
-          ? rawValues.map(() => 0)
-          : rawValues;
+        const values =
+          eorOnly && isNewLogoEorDemoClient(client.key)
+            ? newLogoEorDemoValues(client.key, startIdx, endIdx)
+            : isNewLogoClientZeroRevenue(client.key)
+              ? rawValues.map(() => 0)
+              : rawValues;
         const total = values.reduce((sum, value) => sum + coerceAmount(value), 0);
         const ownerKey = CLIENT_OWNER[client.key];
         const salesName = REP_DEFS.find((r) => r.key === ownerKey)?.name ?? '—';
@@ -1006,9 +1097,17 @@ export default function SalesRevenueAnalyticsPage() {
           total,
         };
       })
+      .filter((row) => {
+        if (!eorOnly) return true;
+        if (isNewLogoEorDemoClient(row.key)) {
+          return projectsForNewLogoClient(row.key).some((p) => p.eor);
+        }
+        return isClientInEorScope(row.key) && projectsForNewLogoClient(row.key).some((p) => p.eor);
+      })
       .sort((a, b) => b.total - a.total);
   }, [
     activeSalesKeys,
+    eorOnly,
     newLogoMonthRange,
     selectedClientIds,
     view.byClient,
@@ -1056,48 +1155,57 @@ export default function SalesRevenueAnalyticsPage() {
     <CaretDownFilled style={{ fontSize: 9, color: '#262626', display: 'block' }} />
   );
 
-  const statItems = useMemo<AnalyticsStatItem[]>(
-    () => [
+  const statItems = useMemo<AnalyticsStatItem[]>(() => {
+    const items: AnalyticsStatItem[] = [
       {
         key: 'total-revenue',
-        title: 'Total Revenue',
+        title: eorOnly ? 'EOR Revenue' : 'Total Revenue',
         value: `$${primaryTotal.toLocaleString('en-US')}`,
         valueVariant: 'metric',
       },
-      {
-        key: 'equity',
-        title: 'Equity',
-        value: `$${cashBreakdown.equity.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'cash',
-        title: 'Cash',
-        valueBreakdown: { paid: cashBreakdown.paid, unpaid: cashBreakdown.unpaid },
-        value: `$${cashBreakdown.cash.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'top-or-share',
-        title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
-        value: isSingleRep ? `${shareOfTeam ?? 0}%` : personFirstName(topRep.name),
-        valueTitle: isSingleRep ? undefined : topRep.name,
-        valueVariant: isSingleRep ? 'metric' : 'person',
-        avatar:
-          !isSingleRep && topRepMeta ? (
-            <Avatar
-              size={32}
-              src={topRepMeta.avatarUrl}
-              alt={topRepMeta.name}
-              style={{ flexShrink: 0, backgroundColor: topRepMeta.color }}
-            >
-              {personInitials(topRepMeta.name)}
-            </Avatar>
-          ) : undefined,
-        rightLabel: isSingleRep ? formatMoneyValue(viewTotal) : formatMoneyValue(topRep.value),
-        rightLabelTone: isSingleRep ? 'positive' : 'default',
-      },
-      {
+    ];
+
+    if (!eorOnly) {
+      items.push(
+        {
+          key: 'equity',
+          title: 'Equity',
+          value: `$${cashBreakdown.equity.toLocaleString('en-US')}`,
+          valueVariant: 'metric',
+        },
+        {
+          key: 'cash',
+          title: 'Cash',
+          valueBreakdown: { paid: cashBreakdown.paid, unpaid: cashBreakdown.unpaid },
+          value: `$${cashBreakdown.cash.toLocaleString('en-US')}`,
+          valueVariant: 'metric',
+        },
+      );
+    }
+
+    items.push({
+      key: 'top-or-share',
+      title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
+      value: isSingleRep ? `${shareOfTeam ?? 0}%` : personFirstName(topRep.name),
+      valueTitle: isSingleRep ? undefined : topRep.name,
+      valueVariant: isSingleRep ? 'metric' : 'person',
+      avatar:
+        !isSingleRep && topRepMeta ? (
+          <Avatar
+            size={32}
+            src={topRepMeta.avatarUrl}
+            alt={topRepMeta.name}
+            style={{ flexShrink: 0, backgroundColor: topRepMeta.color }}
+          >
+            {personInitials(topRepMeta.name)}
+          </Avatar>
+        ) : undefined,
+      rightLabel: isSingleRep ? formatMoneyValue(viewTotal) : formatMoneyValue(topRep.value),
+      rightLabelTone: isSingleRep ? 'positive' : 'default',
+    });
+
+    if (!eorOnly) {
+      items.push({
         key: 'presale-effort',
         title: 'Presale Effort',
         value: presaleEffort.toLocaleString('en-US', {
@@ -1106,10 +1214,11 @@ export default function SalesRevenueAnalyticsPage() {
         }),
         unit: 'Man/Month',
         valueVariant: 'metric',
-      },
-    ],
-    [cashBreakdown, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal],
-  );
+      });
+    }
+
+    return items;
+  }, [cashBreakdown, eorOnly, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal]);
 
   return (
     <DashboardShell selectedMenuKey="billing-dashboard">
@@ -1184,11 +1293,22 @@ export default function SalesRevenueAnalyticsPage() {
               suffixIcon={pillSuffix}
               popupMatchSelectWidth={false}
             />
+            <div className="revenue-analytics-page__eor-filter">
+              <Switch
+                checked={eorOnly}
+                onChange={setEorOnly}
+                aria-label="EOR projects only"
+              />
+              <span className="revenue-analytics-page__eor-filter-label">EOR projects only</span>
+            </div>
           </div>
         </Card>
         </div>
 
-        <AnalyticsStatBar items={statItems} />
+        <AnalyticsStatBar
+          items={statItems}
+          className={eorOnly ? 'analytics-stat-bar--eor-only' : undefined}
+        />
 
         <Card
           bordered
@@ -1198,7 +1318,11 @@ export default function SalesRevenueAnalyticsPage() {
           <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
             Total Revenue Trend
           </Title>
-          {isAllReps ? (
+          {eorOnly ? (
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
+              EOR project revenue only — no Equity or Cash composition ($)
+            </Text>
+          ) : isAllReps ? (
             clientScopeLabel ? (
               <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
                 {`Revenue for ${clientScopeLabel} — Cash, Equity, and Total Revenue trends ($)`}
@@ -1223,32 +1347,41 @@ export default function SalesRevenueAnalyticsPage() {
                 />
                 <RTooltip
                   content={({ active, payload, label }) => (
-                    <TotalRevenueTrendTooltip active={active} payload={payload} label={label} />
+                    <TotalRevenueTrendTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      revenueOnly={eorOnly}
+                    />
                   )}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                <Line
-                  type="monotone"
-                  dataKey="cash"
-                  name="Cash"
-                  stroke={TREND_CASH_COLOR}
-                  strokeWidth={2}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_CASH_COLOR }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="equity"
-                  name="Equity"
-                  stroke={TREND_EQUITY_COLOR}
-                  strokeWidth={2}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_EQUITY_COLOR }}
-                  activeDot={{ r: 5 }}
-                />
+                {!eorOnly ? (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="cash"
+                      name="Cash"
+                      stroke={TREND_CASH_COLOR}
+                      strokeWidth={2}
+                      dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_CASH_COLOR }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="equity"
+                      name="Equity"
+                      stroke={TREND_EQUITY_COLOR}
+                      strokeWidth={2}
+                      dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_EQUITY_COLOR }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </>
+                ) : null}
                 <Line
                   type="monotone"
                   dataKey="revenue"
-                  name="Total Revenue"
+                  name={eorOnly ? 'Revenue' : 'Total Revenue'}
                   stroke={TREND_TOTAL_LINE_COLOR}
                   strokeWidth={2.5}
                   dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: TREND_TOTAL_LINE_COLOR }}
@@ -1366,6 +1499,8 @@ export default function SalesRevenueAnalyticsPage() {
           periodCount={view.periods.length}
           selectedSalesKeys={selectedSalesKeys}
           selectedClientIds={selectedClientIds}
+          eorOnly={eorOnly}
+          initialDrillKey={collectionDrillKey}
         />
 
         <Card
@@ -1375,7 +1510,11 @@ export default function SalesRevenueAnalyticsPage() {
         >
           <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
             Revenue Breakdown
-            {clientScopeLabel ? (
+            {eorOnly ? (
+              <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
+                · EOR only
+              </Text>
+            ) : clientScopeLabel ? (
               <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
                 · {clientScopeLabel}
               </Text>
@@ -1391,12 +1530,12 @@ export default function SalesRevenueAnalyticsPage() {
             dataSource={displayTableRows}
             rowClassName={(record) => {
               if (record.rowType === 'client') return 'analytics-revenue-client-row';
-              return repRowExpandable(record, selectedClientIds)
+              return repRowExpandable(record, selectedClientIds, eorOnly)
                 ? 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
                 : 'analytics-revenue-rep-row';
             }}
             onRow={(record) => {
-              if (record.rowType !== 'rep' || !repRowExpandable(record, selectedClientIds)) {
+              if (record.rowType !== 'rep' || !repRowExpandable(record, selectedClientIds, eorOnly)) {
                 return {};
               }
               const expanded = expandedRepKeys.includes(record.key);
@@ -1452,6 +1591,7 @@ export default function SalesRevenueAnalyticsPage() {
           periodTotals={newLogoPeriodTotals}
           grandTotal={newLogoGrandTotal}
           clientScopeLabel={clientScopeLabel}
+          revenueOnly={eorOnly}
         />
       </div>
     </DashboardShell>

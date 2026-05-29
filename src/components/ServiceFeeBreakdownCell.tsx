@@ -26,6 +26,8 @@ type ServiceFeeBreakdownCellProps = {
   muted?: boolean;
   /** When true, zero renders as $0 (and Equity/Cash $0) instead of "-". */
   showZeroAmount?: boolean;
+  /** EOR projects: show revenue only, no Equity / Cash lines. */
+  revenueOnly?: boolean;
 };
 
 export function ServiceFeeBreakdownCell({
@@ -34,14 +36,23 @@ export function ServiceFeeBreakdownCell({
   profile,
   muted = false,
   showZeroAmount = false,
+  revenueOnly = false,
 }: ServiceFeeBreakdownCellProps) {
   if (coerceAmount(serviceFeeTotal) === 0 && !showZeroAmount) {
     return <Text type="secondary">-</Text>;
   }
 
   const feeProfile = profile ?? feeProfileForClientId(clientId);
-  const fee = splitServiceFeeTotal(serviceFeeTotal, feeProfile);
+  const fee = splitServiceFeeTotal(serviceFeeTotal, feeProfile, revenueOnly);
   const tone = muted ? 'secondary' : undefined;
+
+  if (revenueOnly) {
+    return (
+      <Text strong={!muted} type={tone}>
+        {formatMoneyValue(fee.serviceFeeTotal)}
+      </Text>
+    );
+  }
 
   return (
     <div className="analytics-revenue-fee-cell">

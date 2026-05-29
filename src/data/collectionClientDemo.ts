@@ -6,6 +6,8 @@ export type CollectionProjectDef = {
   key: string;
   name: string;
   weight: number;
+  /** Matches Billing Dashboard project EOR tag — used for Revenue Analytics EOR filter. */
+  eor?: boolean;
 };
 
 export type CollectionClientGroup = {
@@ -34,13 +36,27 @@ function feeForClient(clientId: DemoClientId, index: number): FeeAmountProfile {
   return scaleFeeProfile(base, scale);
 }
 
+/** Demo: only these catalog clients have an EOR-tagged sub-project (Implementation). */
+export const CLIENTS_WITH_EOR_PROJECT = new Set<DemoClientId>([
+  'acme',
+  'globex',
+  'initech',
+  'umbrella',
+  'harbor',
+]);
+
+export function clientHasEorProject(clientId: DemoClientId): boolean {
+  return CLIENTS_WITH_EOR_PROJECT.has(clientId);
+}
+
 function buildProjects(clientId: DemoClientId, displayName: string): CollectionProjectDef[] {
   const primary =
     displayName.includes('·') ? displayName.split('·').slice(1).join('·').trim() : displayName;
+  const hasEor = clientHasEorProject(clientId);
 
   return [
     { key: `${clientId}-p1`, name: primary, weight: 0.34 },
-    { key: `${clientId}-p2`, name: 'Implementation', weight: 0.26 },
+    { key: `${clientId}-p2`, name: 'Implementation', weight: 0.26, eor: hasEor },
     { key: `${clientId}-p3`, name: 'Support retainer', weight: 0.22 },
     { key: `${clientId}-p4`, name: 'Change requests', weight: 0.18 },
   ];

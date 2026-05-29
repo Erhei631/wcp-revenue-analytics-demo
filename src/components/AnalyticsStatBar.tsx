@@ -24,6 +24,7 @@ export type AnalyticsStatItem = {
 
 type AnalyticsStatBarProps = {
   items: AnalyticsStatItem[];
+  className?: string;
 };
 
 function formatBreakdownMoney(n: number) {
@@ -123,9 +124,9 @@ function StatSection({ item, index }: { item: AnalyticsStatItem; index: number }
   );
 }
 
-export function AnalyticsStatBar({ items }: AnalyticsStatBarProps) {
+export function AnalyticsStatBar({ items, className }: AnalyticsStatBarProps) {
   return (
-    <div className="analytics-stat-bar">
+    <div className={className ? `analytics-stat-bar ${className}` : 'analytics-stat-bar'}>
       {items.map((item, index) => (
         <StatSection key={item.key} item={item} index={index} />
       ))}

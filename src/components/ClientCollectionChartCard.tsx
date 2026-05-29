@@ -19,7 +19,7 @@ import {
   YAxis,
   type BarRectangleItem,
 } from 'recharts';
-import { THEME_PRIMARY } from '../constants/chartColors';
+import { CHART_PURPLE, THEME_PRIMARY } from '../constants/chartColors';
 import {
   COLLECTION_CLIENT_GROUPS,
   type CollectionClientGroup,
@@ -27,6 +27,7 @@ import {
 } from '../data/collectionClientDemo';
 import { DEMO_CLIENT_IDS, type DemoClientId } from '../data/demoClientCatalog';
 import type { DemoRepKey } from '../data/analyticsDemoSeries';
+import { eorRevenueFraction, isClientInEorScope, projectsForRevenueScope } from '../data/eorProjectDemo';
 
 const { Text, Title } = Typography;
 
@@ -106,8 +107,10 @@ type CollectionBarRow = {
   unpaid: number;
   /** Cash = Invoice = Paid + Unpaid */
   cash: number;
-  /** Service Fee Total = Equity + Cash */
+  /** Service Fee Total = Equity + Cash; for EOR, equals revenue with no fee split. */
   serviceFeeTotal: number;
+  /** EOR projects: single revenue amount, no Equity / Cash composition. */
+  revenueOnly?: boolean;
 };
 
 function toBarRow(
@@ -127,6 +130,39 @@ function toBarRow(
     cash,
     serviceFeeTotal: equity + cash,
   };
+}
+
+function toRevenueBarRow(key: string, label: string, revenue: number): CollectionBarRow {
+  const total = Math.max(0, Math.round(revenue));
+  return {
+    key,
+    label,
+    equity: 0,
+    paid: 0,
+    unpaid: 0,
+    cash: 0,
+    serviceFeeTotal: total,
+    revenueOnly: true,
+  };
+}
+
+function groupServiceFeeTotal(group: CollectionClientGroup) {
+  return group.equity + group.paid + group.unpaid;
+}
+
+function splitRevenueByWeights(
+  totalRevenue: number,
+  projects: CollectionProjectDef[],
+): CollectionBarRow[] {
+  const totalWeight = projects.reduce((s, p) => s + p.weight, 0);
+  if (totalWeight <= 0) return [];
+  let remaining = totalRevenue;
+  return projects.map((project, index) => {
+    const isLast = index === projects.length - 1;
+    const share = isLast ? remaining : Math.round((totalRevenue * project.weight) / totalWeight);
+    remaining -= share;
+    return toRevenueBarRow(project.key, project.name, share);
+  });
 }
 
 function money(n: number) {
@@ -182,17 +218,26 @@ function buildClientRows(
   periodCount: number,
   salesKeys: CollectionChartSalesFilter,
   clientIds: CollectionChartClientFilter,
+  eorOnly: boolean,
 ): CollectionBarRow[] {
   const salesSet = new Set(salesKeys);
   const allSales = isAllSalesSelected(salesKeys);
 
   return COLLECTION_CLIENT_GROUPS.filter(
-    (g) => (allSales || salesSet.has(g.owner)) && matchesClientFilter(g, clientIds),
+    (g) =>
+      (allSales || salesSet.has(g.owner)) &&
+      matchesClientFilter(g, clientIds) &&
+      (!eorOnly || isClientInEorScope(g.filterClientId)),
   )
     .map((group) => {
-      const equity = scaleForPeriod(group.equity, periodCount);
-      const paid = scaleForPeriod(group.paid, periodCount);
-      const unpaid = scaleForPeriod(group.unpaid, periodCount);
+      const scale = eorOnly ? eorRevenueFraction(group.projects) : 1;
+      if (eorOnly) {
+        const revenue = Math.round(scaleForPeriod(groupServiceFeeTotal(group), periodCount) * scale);
+        return toRevenueBarRow(group.key, group.label, revenue);
+      }
+      const equity = Math.round(scaleForPeriod(group.equity, periodCount) * scale);
+      const paid = Math.round(scaleForPeriod(group.paid, periodCount) * scale);
+      const unpaid = Math.round(scaleForPeriod(group.unpaid, periodCount) * scale);
       return toBarRow(group.key, group.label, equity, paid, unpaid);
     })
     .filter((row) => row.serviceFeeTotal > 0)
@@ -217,14 +262,26 @@ function isProjectRow(row: CollectionBarRow) {
   return COLLECTION_CLIENT_GROUPS.some((g) => g.projects.some((p) => p.key === row.key));
 }
 
-function buildProjectRows(clientKey: string, periodCount: number): CollectionBarRow[] {
+function buildProjectRows(
+  clientKey: string,
+  periodCount: number,
+  eorOnly: boolean,
+): CollectionBarRow[] {
   const group = COLLECTION_CLIENT_GROUPS.find((g) => g.key === clientKey);
   if (!group) return [];
 
-  const equity = scaleForPeriod(group.equity, periodCount);
-  const paid = scaleForPeriod(group.paid, periodCount);
-  const unpaid = scaleForPeriod(group.unpaid, periodCount);
-  return splitByWeights(equity, paid, unpaid, group.projects);
+  const projects = projectsForRevenueScope(group.projects, eorOnly);
+  if (projects.length === 0) return [];
+
+  const amountScale = eorOnly ? eorRevenueFraction(group.projects) : 1;
+  if (eorOnly) {
+    const revenue = Math.round(scaleForPeriod(groupServiceFeeTotal(group), periodCount) * amountScale);
+    return splitRevenueByWeights(revenue, projects);
+  }
+  const equity = Math.round(scaleForPeriod(group.equity, periodCount) * amountScale);
+  const paid = Math.round(scaleForPeriod(group.paid, periodCount) * amountScale);
+  const unpaid = Math.round(scaleForPeriod(group.unpaid, periodCount) * amountScale);
+  return splitByWeights(equity, paid, unpaid, projects);
 }
 
 const chartTooltipShellStyle: CSSProperties = {
@@ -268,22 +325,28 @@ function CollectionTooltip({
         ) : null}
       </div>
       <div className="collection-tooltip__divider" />
-      <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
-      <div className="collection-tooltip__divider" />
-      <div className="collection-tooltip__body">
-        <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} valueBold />
-        {isProjectBar ? (
-          <TooltipRow color={FEE_PAID} label="Cash" value={money(row.cash)} valueBold />
-        ) : (
-          <div className="collection-tooltip-cash">
-            <TooltipRow label="Cash" value={money(row.cash)} valueBold />
-            <div className="collection-tooltip-cash__tree">
-              <TooltipRow color={FEE_PAID} label="Paid" value={money(row.paid)} nested />
-              <TooltipRow color={FEE_UNPAID} label="Unpaid" value={money(row.unpaid)} nested />
-            </div>
+      {row.revenueOnly ? (
+        <TooltipRow color={CHART_PURPLE} label="Revenue" value={money(row.serviceFeeTotal)} strong />
+      ) : (
+        <>
+          <TooltipRow label="Service Fee" value={money(row.serviceFeeTotal)} strong />
+          <div className="collection-tooltip__divider" />
+          <div className="collection-tooltip__body">
+            <TooltipRow color={FEE_EQUITY} label="Equity" value={money(row.equity)} valueBold />
+            {isProjectBar ? (
+              <TooltipRow color={FEE_PAID} label="Cash" value={money(row.cash)} valueBold />
+            ) : (
+              <div className="collection-tooltip-cash">
+                <TooltipRow label="Cash" value={money(row.cash)} valueBold />
+                <div className="collection-tooltip-cash__tree">
+                  <TooltipRow color={FEE_PAID} label="Paid" value={money(row.paid)} nested />
+                  <TooltipRow color={FEE_UNPAID} label="Unpaid" value={money(row.unpaid)} nested />
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
       {showProjectDetails ? (
         <>
           <div className="collection-tooltip__divider" />
@@ -339,6 +402,7 @@ function TooltipRow({
 function renderAccountOverviewBars({
   activeDrillKey,
   chartMax,
+  revenueOnly,
   onBarClick,
   barSize,
   onBarMouseEnter,
@@ -346,6 +410,7 @@ function renderAccountOverviewBars({
 }: {
   activeDrillKey: string | null;
   chartMax: number;
+  revenueOnly: boolean;
   onBarClick: (row: CollectionBarRow) => void;
   barSize: number;
   onBarMouseEnter: (data: BarRectangleItem, event: ReactMouseEvent<SVGPathElement>) => void;
@@ -354,7 +419,7 @@ function renderAccountOverviewBars({
   const isProjectView = Boolean(activeDrillKey);
   const barPointerProps = {
     barSize,
-    stackId: 'fee' as const,
+    stackId: revenueOnly ? ('revenue' as const) : ('fee' as const),
     cursor: isProjectView ? ('default' as const) : ('pointer' as const),
     onMouseEnter: (data: BarRectangleItem, _index: number, event: ReactMouseEvent<SVGPathElement>) =>
       onBarMouseEnter(data, event),
@@ -386,7 +451,15 @@ function renderAccountOverviewBars({
         axisLine={{ stroke: '#e8e8e8' }}
       />
       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-      {isProjectView ? (
+      {revenueOnly ? (
+        <Bar
+          dataKey="serviceFeeTotal"
+          name="Revenue"
+          fill={CHART_PURPLE}
+          radius={[4, 4, 0, 0]}
+          {...barPointerProps}
+        />
+      ) : isProjectView ? (
         <>
           <Bar dataKey="cash" name="Cash" fill={FEE_PAID} {...barPointerProps} />
           <Bar dataKey="equity" name="Equity" fill={FEE_EQUITY} radius={[4, 4, 0, 0]} {...barPointerProps} />
@@ -407,6 +480,9 @@ type ClientCollectionChartCardProps = {
   periodCount: number;
   selectedSalesKeys: CollectionChartSalesFilter;
   selectedClientIds: CollectionChartClientFilter;
+  eorOnly?: boolean;
+  /** Deep-link: open project drill-down for this client group key (e.g. `acme`). */
+  initialDrillKey?: string | null;
 };
 
 export function ClientCollectionChartCard({
@@ -414,19 +490,31 @@ export function ClientCollectionChartCard({
   periodCount,
   selectedSalesKeys,
   selectedClientIds,
+  eorOnly = false,
+  initialDrillKey = null,
 }: ClientCollectionChartCardProps) {
-  const [clickedDrillKey, setClickedDrillKey] = useState<string | null>(null);
+  const [clickedDrillKey, setClickedDrillKey] = useState<string | null>(initialDrillKey);
   const [tooltipRow, setTooltipRow] = useState<CollectionBarRow | null>(null);
   const [tooltipAnchor, setTooltipAnchor] = useState<{ x: number; y: number } | null>(null);
   const [tooltipPinned, setTooltipPinned] = useState(false);
   const chartInnerRef = useRef<HTMLDivElement>(null);
+  const captureRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setClickedDrillKey(null);
+    setClickedDrillKey(initialDrillKey ?? null);
     setTooltipRow(null);
     setTooltipAnchor(null);
     setTooltipPinned(false);
-  }, [filterScopeKey]);
+  }, [filterScopeKey, initialDrillKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('drill') && !params.get('figmacapture')) return;
+    const timer = window.setTimeout(() => {
+      captureRootRef.current?.scrollIntoView({ block: 'center' });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [filterScopeKey, initialDrillKey]);
 
   const filterDrillKey = useMemo(() => {
     if (isAllClientsSelected(selectedClientIds) || selectedClientIds.length !== 1) return null;
@@ -437,8 +525,8 @@ export function ClientCollectionChartCard({
   const drillFromFilter = filterDrillKey != null && clickedDrillKey == null;
 
   const clientRows = useMemo(
-    () => buildClientRows(periodCount, selectedSalesKeys, selectedClientIds),
-    [periodCount, selectedClientIds, selectedSalesKeys, filterScopeKey],
+    () => buildClientRows(periodCount, selectedSalesKeys, selectedClientIds, eorOnly),
+    [eorOnly, periodCount, selectedClientIds, selectedSalesKeys, filterScopeKey],
   );
 
   const drillGroup = useMemo(
@@ -447,8 +535,8 @@ export function ClientCollectionChartCard({
   );
 
   const projectRows = useMemo(
-    () => (activeDrillKey ? buildProjectRows(activeDrillKey, periodCount) : []),
-    [activeDrillKey, periodCount, filterScopeKey],
+    () => (activeDrillKey ? buildProjectRows(activeDrillKey, periodCount, eorOnly) : []),
+    [activeDrillKey, eorOnly, periodCount, filterScopeKey],
   );
 
   const chartRows = activeDrillKey ? projectRows : clientRows;
@@ -526,6 +614,8 @@ export function ClientCollectionChartCard({
   if (chartRows.length === 0) {
     return (
       <Card
+        id="account-overview-capture"
+        className="account-overview-card"
         bordered
         style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
         styles={{ body: { padding: '18px 18px 18px' } }}
@@ -534,7 +624,9 @@ export function ClientCollectionChartCard({
           Account Overview
         </Title>
         <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 13, lineHeight: 1.5 }}>
-          Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
+          {eorOnly
+            ? 'EOR project revenue only (no Equity / Cash split). Click a bar to view EOR sub-projects.'
+            : 'Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.'}
         </Text>
         <Text type="secondary" style={{ fontSize: 13 }}>
           No clients match the current sales and client filters in this view.
@@ -544,7 +636,9 @@ export function ClientCollectionChartCard({
   }
 
   return (
+    <div ref={captureRootRef} id="account-overview-capture" className="account-overview-capture-root">
     <Card
+      className="account-overview-card"
       bordered
       style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
       styles={{ body: { padding: '18px 18px 18px' } }}
@@ -574,7 +668,9 @@ export function ClientCollectionChartCard({
         </div>
         {!drillGroup ? (
           <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
-            Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.
+            {eorOnly
+              ? 'EOR project revenue only (no Equity / Cash split). Click a bar to view EOR sub-projects.'
+              : 'Service fee total by Equity and Cash (Invoice). Click a bar to view sub-projects.'}
           </Text>
         ) : null}
       </div>
@@ -613,6 +709,7 @@ export function ClientCollectionChartCard({
               {renderAccountOverviewBars({
                 activeDrillKey,
                 chartMax,
+                revenueOnly: eorOnly,
                 onBarClick: handleBarClick,
                 barSize: barLayout.barSize,
                 onBarMouseEnter: handleBarMouseEnter,
@@ -640,5 +737,6 @@ export function ClientCollectionChartCard({
         </div>
       </div>
     </Card>
+    </div>
   );
 }
