@@ -50,7 +50,6 @@ import {
   splitServiceFeeTotal,
 } from '../data/accountFeeProfiles';
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
-import { EorProjectTag } from '../components/EorProjectTag';
 import { COLLECTION_CLIENT_GROUPS } from '../data/collectionClientDemo';
 import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
 import {
@@ -87,8 +86,6 @@ import { presaleEffortFromHours, sumPresaleHours } from '../data/presaleDemoHour
 import {
   eorRevenueFractionForClient,
   isClientInEorScope,
-  isEorProjectName,
-  projectsForRevenueScope,
   scaleAmountForEor,
 } from '../data/eorProjectDemo';
 import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
@@ -382,45 +379,31 @@ type RevenueBreakdownRow = {
   total: number;
 };
 
-type ProjectRevenueLine = { project: string; revenue: number; eor?: boolean };
+type ClientRevenueLine = { name: string; revenue: number };
 
-/** Demo project splits per rep (weights sum to 1). */
-const REP_PROJECT_SPLITS: Record<RepKey, readonly { name: string; weight: number; eor?: boolean }[]> = {
-  alice: [
-    { name: 'Acme Corp · ERP rollout', weight: 0.58 },
-    { name: 'Northwind SaaS', weight: 0.42, eor: true },
-  ],
-  bob: [
-    { name: 'Globex · Data platform', weight: 0.62 },
-    { name: 'Contoso Analytics', weight: 0.38, eor: true },
-  ],
-  carol: [
-    { name: 'Initech · Billing integration', weight: 0.55 },
-    { name: 'Fabrikam Support', weight: 0.45, eor: true },
-  ],
-  david: [
-    { name: 'Umbrella · Mobile app', weight: 0.52 },
-    { name: 'Tailspin IoT', weight: 0.48, eor: true },
-  ],
-};
+function clientsForRepBreakdown(repKey: RepKey, eorOnly: boolean) {
+  return DEMO_CLIENT_CATALOG.filter(
+    (c) => c.owner === repKey && (!eorOnly || isClientInEorScope(c.id)),
+  ).map((c) => ({ name: c.name, weight: c.weight }));
+}
 
-function splitAmountByProjects(
+function splitAmountByClients(
   amount: number,
-  projects: readonly { name: string; weight: number; eor?: boolean }[],
-): ProjectRevenueLine[] {
-  if (projects.length === 0) return [];
+  clients: readonly { name: string; weight: number }[],
+): ClientRevenueLine[] {
+  if (clients.length === 0) return [];
   if (amount <= 0) {
-    return projects.map((p) => ({ project: p.name, revenue: 0, eor: p.eor }));
+    return clients.map((c) => ({ name: c.name, revenue: 0 }));
   }
-  const totalWeight = projects.reduce((s, p) => s + p.weight, 0);
+  const totalWeight = clients.reduce((s, c) => s + c.weight, 0);
   let remaining = amount;
-  return projects.map((p, i) => {
-    if (i === projects.length - 1) {
-      return { project: p.name, revenue: remaining, eor: p.eor };
+  return clients.map((c, i) => {
+    if (i === clients.length - 1) {
+      return { name: c.name, revenue: remaining };
     }
-    const share = Math.round((amount * p.weight) / totalWeight);
+    const share = Math.round((amount * c.weight) / totalWeight);
     remaining -= share;
-    return { project: p.name, revenue: share, eor: p.eor };
+    return { name: c.name, revenue: share };
   });
 }
 
@@ -429,11 +412,10 @@ function breakdownForCell(
   amount: number,
   clientIds: ClientFilter,
   eorOnly: boolean,
-): ProjectRevenueLine[] {
+): ClientRevenueLine[] {
   if (amount === 0) return [];
   if (isAllClientsSelected(clientIds)) {
-    const projects = projectsForRevenueScope(REP_PROJECT_SPLITS[repKey], eorOnly);
-    return splitAmountByProjects(amount, projects);
+    return splitAmountByClients(amount, clientsForRepBreakdown(repKey, eorOnly));
   }
 
   const owned = clientIds.filter((id) => CLIENT_OWNER[id] === repKey);
@@ -442,16 +424,16 @@ function breakdownForCell(
     const clientId = owned[0]!;
     if (eorOnly && eorRevenueFractionForClient(clientId) <= 0) return [];
     const client = CLIENTS.find((c) => c.id === clientId);
-    return [{ project: client?.name ?? clientId, revenue: amount }];
+    return [{ name: client?.name ?? clientId, revenue: amount }];
   }
 
-  const projects = owned
-    .filter((id) => !eorOnly || eorRevenueFractionForClient(id) > 0)
+  const clients = owned
+    .filter((id) => !eorOnly || isClientInEorScope(id))
     .map((id) => ({
       name: CLIENTS.find((c) => c.id === id)?.name ?? id,
       weight: CLIENT_TAKE_OF_OWNER[id] ?? 1,
     }));
-  return splitAmountByProjects(amount, projects);
+  return splitAmountByClients(amount, clients);
 }
 
 function breakdownForRowTotal(
@@ -459,20 +441,14 @@ function breakdownForRowTotal(
   values: number[],
   clientIds: ClientFilter,
   eorOnly: boolean,
-): ProjectRevenueLine[] {
+): ClientRevenueLine[] {
   const totals = new Map<string, number>();
-  const eorByProject = new Map<string, boolean>();
   values.forEach((amount) => {
-    breakdownForCell(repKey, amount, clientIds, eorOnly).forEach(({ project, revenue, eor }) => {
-      totals.set(project, (totals.get(project) ?? 0) + revenue);
-      if (eor) eorByProject.set(project, true);
+    breakdownForCell(repKey, amount, clientIds, eorOnly).forEach(({ name, revenue }) => {
+      totals.set(name, (totals.get(name) ?? 0) + revenue);
     });
   });
-  return [...totals.entries()].map(([project, revenue]) => ({
-    project,
-    revenue,
-    eor: eorByProject.get(project),
-  }));
+  return [...totals.entries()].map(([name, revenue]) => ({ name, revenue }));
 }
 
 type ClientBreakdownRow = {
@@ -481,7 +457,6 @@ type ClientBreakdownRow = {
   values: number[];
   total: number;
   clientId?: ClientId;
-  eor?: boolean;
 };
 
 function clientRowsForRep(
@@ -493,20 +468,18 @@ function clientRowsForRep(
   const lines = breakdownForRowTotal(repKey, values, clientIds, eorOnly);
   if (lines.length === 0) return [];
 
-  return lines.map(({ project, eor: lineEor }) => {
+  return lines.map(({ name }) => {
     const childValues = values.map((amount) => {
       const cellLines = breakdownForCell(repKey, amount, clientIds, eorOnly);
-      return cellLines.find((line) => line.project === project)?.revenue ?? 0;
+      return cellLines.find((line) => line.name === name)?.revenue ?? 0;
     });
-    const matchedClient = CLIENTS.find((c) => c.name === project);
-    const clientId = matchedClient?.id;
+    const matchedClient = CLIENTS.find((c) => c.name === name);
     return {
-      key: `${repKey}::${project}`,
-      name: project,
+      key: `${repKey}::${name}`,
+      name,
       values: childValues,
       total: childValues.reduce((a, b) => a + coerceAmount(b), 0),
-      clientId,
-      eor: lineEor ?? isEorProjectName(project, clientId),
+      clientId: matchedClient?.id,
     };
   });
 }
@@ -853,15 +826,9 @@ export default function SalesRevenueAnalyticsPage() {
         render: (name: string, record) => {
           if (record.rowType === 'client') {
             return (
-              <Space
-                size={6}
-                align="center"
-                style={{ display: 'flex', paddingLeft: 34, fontSize: 13 }}
-                wrap
-              >
-                <Text type="secondary">{name}</Text>
-                {record.eor ? <EorProjectTag /> : null}
-              </Space>
+              <Text type="secondary" style={{ display: 'block', paddingLeft: 34, fontSize: 13 }}>
+                {name}
+              </Text>
             );
           }
 
@@ -1510,11 +1477,7 @@ export default function SalesRevenueAnalyticsPage() {
         >
           <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
             Revenue Breakdown
-            {eorOnly ? (
-              <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
-                · EOR only
-              </Text>
-            ) : clientScopeLabel ? (
+            {!eorOnly && clientScopeLabel ? (
               <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
                 · {clientScopeLabel}
               </Text>

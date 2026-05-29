@@ -260,11 +260,7 @@ export function NewLogosBreakdownTable({
     >
       <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
         New Logos
-        {revenueOnly ? (
-          <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
-            · EOR projects only
-          </Text>
-        ) : clientScopeLabel ? (
+        {!revenueOnly && clientScopeLabel ? (
           <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
             · {clientScopeLabel}
           </Text>

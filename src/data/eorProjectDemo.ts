@@ -49,27 +49,3 @@ export function projectsForRevenueScope<T extends EorWeightedProject>(
   if (!eorOnly) return [...projects];
   return projects.filter((p) => p.eor);
 }
-
-/** Rep-level demo project lines (must stay in sync with SalesRevenueAnalyticsPage REP_PROJECT_SPLITS). */
-const REP_SPLIT_EOR_BY_PROJECT_NAME = new Set([
-  'Northwind SaaS',
-  'Contoso Analytics',
-  'Fabrikam Support',
-  'Tailspin IoT',
-]);
-
-/** Whether a breakdown / new-logo project row should show the EOR badge. */
-export function isEorProjectName(projectName: string, clientId?: DemoClientId): boolean {
-  if (clientId) {
-    const group = COLLECTION_CLIENT_GROUPS.find((g) => g.filterClientId === clientId);
-    const match = group?.projects.find((p) => p.name === projectName);
-    if (match) return Boolean(match.eor);
-  }
-
-  for (const group of COLLECTION_CLIENT_GROUPS) {
-    const match = group.projects.find((p) => p.name === projectName);
-    if (match) return Boolean(match.eor);
-  }
-
-  return REP_SPLIT_EOR_BY_PROJECT_NAME.has(projectName);
-}
