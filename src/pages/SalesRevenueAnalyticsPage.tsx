@@ -1218,16 +1218,26 @@ export default function SalesRevenueAnalyticsPage() {
   );
 
   const eorBillingStatItems = useMemo<AnalyticsStatItem[]>(
-    () => [
+    () => {
+      const eorTotal =
+        eorBillingSummary.serviceFeeRevenue + eorBillingSummary.costs + eorBillingSummary.credit;
+
+      return [
+      {
+        key: 'eor-total',
+        title: 'EOR Total',
+        value: `$${eorTotal.toLocaleString('en-US')}`,
+        valueVariant: 'metric',
+      },
       {
         key: 'service-fee-revenue',
-        title: 'Service Fee Revenue',
+        title: 'Service Fee',
         value: `$${eorBillingSummary.serviceFeeRevenue.toLocaleString('en-US')}`,
         valueVariant: 'metric',
       },
       {
         key: 'costs',
-        title: 'Costs',
+        title: 'Cost',
         value: `$${eorBillingSummary.costs.toLocaleString('en-US')}`,
         valueVariant: 'metric',
       },
@@ -1243,7 +1253,8 @@ export default function SalesRevenueAnalyticsPage() {
         value: eorBillingSummary.projectCount.toLocaleString('en-US'),
         valueVariant: 'metric',
       },
-    ],
+    ];
+    },
     [eorBillingSummary],
   );
 

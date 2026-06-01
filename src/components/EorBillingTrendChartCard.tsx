@@ -51,6 +51,8 @@ function EorBillingTrendTooltip({
 }) {
   if (!active || !payload?.length) return null;
 
+  const total = payload.reduce((sum, entry) => sum + Number(entry.value ?? 0), 0);
+
   return (
     <div
       className="collection-tooltip"
@@ -75,6 +77,11 @@ function EorBillingTrendTooltip({
           <strong>{formatMoneyValue(Number(entry.value))}</strong>
         </div>
       ))}
+      <div className="collection-tooltip__divider" aria-hidden />
+      <div className="collection-tooltip__row">
+        <span>Total</span>
+        <strong>{formatMoneyValue(total)}</strong>
+      </div>
     </div>
   );
 }
@@ -144,7 +151,7 @@ export function EorBillingTrendChartCard({
             <Line
               type="monotone"
               dataKey="costs"
-              name="Costs"
+              name="Cost"
               stroke={EOR_COSTS}
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: EOR_COSTS }}

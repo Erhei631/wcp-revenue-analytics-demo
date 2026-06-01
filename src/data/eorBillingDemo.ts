@@ -406,7 +406,6 @@ export function summarizeEorBilling(params: EorBillingFilterParams): EorBillingS
   let projectCount = 0;
 
   for (const project of filtered) {
-    let hasActivity = false;
     const amounts = sumProjectAmounts(project, params.rangeStartIdx, params.rangeEndIdx);
 
     serviceFeeRevenue += amounts.serviceFeeRevenue;
@@ -414,10 +413,8 @@ export function summarizeEorBilling(params: EorBillingFilterParams): EorBillingS
     credit += amounts.credit;
 
     if (amounts.serviceFeeRevenue + amounts.costs + amounts.credit > 0) {
-      hasActivity = true;
+      projectCount += 1;
     }
-
-    if (hasActivity) projectCount += 1;
   }
 
   return { serviceFeeRevenue, costs, credit, projectCount };

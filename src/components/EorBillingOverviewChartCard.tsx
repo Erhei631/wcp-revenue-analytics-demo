@@ -113,6 +113,9 @@ function EorBillingTooltip({
   const row = payload[0]?.payload;
   if (!row) return null;
 
+  const isClientBar = (DEMO_CLIENT_IDS as readonly string[]).includes(row.key);
+  const salesLabel = isClientBar ? SALES_REP_LABELS[row.owner] : null;
+
   return (
     <div
       className="collection-tooltip"
@@ -126,6 +129,9 @@ function EorBillingTooltip({
     >
       <div className="collection-tooltip__header-block">
         <div className="collection-tooltip__header">{row.label}</div>
+        {salesLabel ? (
+          <div className="collection-tooltip__sales">Sales: {salesLabel}</div>
+        ) : null}
       </div>
       <div className="collection-tooltip__divider" />
       <div className="collection-tooltip__row">
@@ -138,7 +144,7 @@ function EorBillingTooltip({
       <div className="collection-tooltip__row">
         <span className="collection-tooltip__row-label">
           <span className="collection-tooltip__dot" style={{ background: EOR_COSTS }} />
-          Costs
+          Cost
         </span>
         <strong>{formatMoneyValue(row.costs)}</strong>
       </div>
@@ -240,7 +246,7 @@ export function EorBillingOverviewChartCard({
         styles={{ body: { padding: '18px 18px 18px' } }}
       >
         <Title level={5} style={{ marginTop: 0, marginBottom: 8 }}>
-          Account Overview
+          Client Overview
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>
           No EOR clients match the current filters in this view.
@@ -283,7 +289,7 @@ export function EorBillingOverviewChartCard({
                 ) : null}
               </span>
             ) : (
-              'Account Overview'
+              'Client Overview'
             )}
           </Title>
         </div>
@@ -348,7 +354,7 @@ export function EorBillingOverviewChartCard({
               />
               <Bar
                 dataKey="costs"
-                name="Costs"
+                name="Cost"
                 fill={EOR_COSTS}
                 stackId="eor"
                 barSize={barLayout.barSize}

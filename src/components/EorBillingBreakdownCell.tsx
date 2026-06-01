@@ -42,7 +42,7 @@ export function EorBillingBreakdownCell({
         Service Fee {moneyShort(amounts.serviceFeeRevenue)}
       </Text>
       <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Costs {moneyShort(amounts.costs)}
+        Cost {moneyShort(amounts.costs)}
       </Text>
       <Text type="secondary" className="analytics-revenue-fee-cell__part">
         Credit {moneyShort(amounts.credit)}
