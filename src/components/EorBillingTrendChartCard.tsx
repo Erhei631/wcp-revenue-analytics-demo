@@ -116,7 +116,7 @@ export function EorBillingTrendChartCard({
       styles={{ body: { padding: '18px 18px 8px' } }}
     >
       <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-        Billing Trend
+        EOR Billing Items Trend
       </Title>
       <div style={{ width: '100%', height: 320 }}>
         <ResponsiveContainer key={`eor-trend-${filterScopeKey}`}>

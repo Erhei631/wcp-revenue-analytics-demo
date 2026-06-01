@@ -26,7 +26,7 @@ const revenueAnalyticsButtonProps = {
   type: 'default' as const,
   className: 'billing-revenue-analytics-btn',
   icon: <ExportOutlined />,
-  children: 'Revenue Analytics',
+  children: 'Billing Analytics',
 };
 
 export function RevenueAnalyticsToolbarButton({

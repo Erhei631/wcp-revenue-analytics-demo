@@ -194,7 +194,7 @@ export function EorBillingBreakdownTable({
       styles={{ body: { padding: '18px 18px 18px' } }}
     >
       <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-        EOR Billing
+        EOR Breakdown
       </Title>
       <div className="analytics-revenue-table-scroll">
         <Table<DisplayRow>
