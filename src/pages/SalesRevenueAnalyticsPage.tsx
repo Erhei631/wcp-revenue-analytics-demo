@@ -1306,7 +1306,7 @@ export default function SalesRevenueAnalyticsPage() {
                   Billing Dashboard
                 </Link>
                 <Text style={{ color: '#1f1f1f' }}>-</Text>
-                <Text style={{ color: '#1f1f1f', fontWeight: 500 }}>Revenue Analytics</Text>
+                <Text style={{ color: '#1f1f1f', fontWeight: 500 }}>Billing Analytics</Text>
               </Space>
             </Space>
         </div>
