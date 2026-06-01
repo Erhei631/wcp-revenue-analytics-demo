@@ -221,6 +221,10 @@ svg {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.analytics-stat-bar.analytics-stat-bar--eor-billing {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .analytics-stat-bar__section-wrap {
   position: relative;
   min-width: 0;
@@ -874,8 +878,18 @@ svg {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px 20px;
+}
+
+.revenue-analytics-page__filters-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 20px;
   row-gap: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
 .revenue-analytics-page__filters-date-group {
@@ -911,6 +925,53 @@ svg {
 
 .revenue-analytics-page__eor-filter .ant-switch.ant-switch-checked {
   background: var(--theme-primary, #469bff);
+}
+
+.revenue-analytics-section-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.revenue-analytics-section-tabs__btn {
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 0;
+  background: #fff;
+  color: #8c8c8c;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.revenue-analytics-section-tabs__btn + .revenue-analytics-section-tabs__btn {
+  border-left: 1px solid #d9d9d9;
+}
+
+.revenue-analytics-section-tabs__btn--active {
+  background: var(--theme-primary, #469bff);
+  color: #fff;
+  font-weight: 500;
+}
+
+.revenue-analytics-section-tabs__btn--active + .revenue-analytics-section-tabs__btn,
+.revenue-analytics-section-tabs__btn + .revenue-analytics-section-tabs__btn--active {
+  border-left-color: var(--theme-primary, #469bff);
+}
+
+.revenue-analytics-section-tabs__btn:focus-visible {
+  outline: 2px solid rgba(70, 155, 255, 0.45);
+  outline-offset: 1px;
 }
 
 .eor-project-tag.ant-tag {

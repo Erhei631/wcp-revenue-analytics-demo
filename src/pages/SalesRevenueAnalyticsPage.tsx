@@ -5,7 +5,6 @@ import {
   Empty,
   Select,
   Space,
-  Switch,
   Table,
   Typography,
 } from 'antd';
@@ -81,6 +80,10 @@ import {
   CHART_RED_SOFT,
   THEME_PRIMARY,
 } from '../constants/chartColors';
+import {
+  RevenueAnalyticsSectionTabs,
+  type RevenueAnalyticsSection,
+} from '../components/RevenueAnalyticsSectionTabs';
 import { DashboardShell } from '../layout/DashboardShell';
 import { presaleEffortFromHours, sumPresaleHours } from '../data/presaleDemoHours';
 import {
@@ -88,6 +91,10 @@ import {
   isClientInEorScope,
   scaleAmountForEor,
 } from '../data/eorProjectDemo';
+import { summarizeEorBilling, buildEorBillingTableData } from '../data/eorBillingDemo';
+import { EorBillingOverviewChartCard } from '../components/EorBillingOverviewChartCard';
+import { EorBillingTrendChartCard } from '../components/EorBillingTrendChartCard';
+import { EorBillingBreakdownTable } from '../components/EorBillingBreakdownTable';
 import { coerceAmount, formatMoney, formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text, Title } = Typography;
@@ -719,7 +726,9 @@ export default function SalesRevenueAnalyticsPage() {
   const [activePreset, setActivePreset] = useState<QuickPresetKey | null>('ytd');
   const [selectedSalesKeys, setSelectedSalesKeys] = useState<SalesFilter>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<ClientFilter>([]);
-  const [eorOnly, setEorOnly] = useState(false);
+  const eorOnly = false;
+  const [analyticsSection, setAnalyticsSection] =
+    useState<RevenueAnalyticsSection>('revenue-analytic');
   const [expandedRepKeys, setExpandedRepKeys] = useState<RepKey[]>([]);
   const [revenueTrendView, setRevenueTrendView] = useState<'sales' | 'client'>(() => {
     const trend = new URLSearchParams(window.location.search).get('trend');
@@ -1187,6 +1196,81 @@ export default function SalesRevenueAnalyticsPage() {
     return items;
   }, [cashBreakdown, eorOnly, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal]);
 
+  const eorBillingRange = useMemo(() => {
+    const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
+      .filter(({ month }) => monthInRange(month, normalizedMonthRange))
+      .map(({ i }) => i);
+    return {
+      startIdx: indices[0] ?? 0,
+      endIdx: indices[indices.length - 1] ?? 0,
+    };
+  }, [filterScopeKey, normalizedMonthRange]);
+
+  const eorBillingSummary = useMemo(
+    () =>
+      summarizeEorBilling({
+        rangeStartIdx: eorBillingRange.startIdx,
+        rangeEndIdx: eorBillingRange.endIdx,
+        clientIds: selectedClientIds,
+        salesKeys: activeSalesKeys,
+      }),
+    [activeSalesKeys, eorBillingRange.endIdx, eorBillingRange.startIdx, selectedClientIds],
+  );
+
+  const eorBillingStatItems = useMemo<AnalyticsStatItem[]>(
+    () => [
+      {
+        key: 'service-fee-revenue',
+        title: 'Service Fee Revenue',
+        value: `$${eorBillingSummary.serviceFeeRevenue.toLocaleString('en-US')}`,
+        valueVariant: 'metric',
+      },
+      {
+        key: 'costs',
+        title: 'Costs',
+        value: `$${eorBillingSummary.costs.toLocaleString('en-US')}`,
+        valueVariant: 'metric',
+      },
+      {
+        key: 'credit',
+        title: 'Credit',
+        value: `$${eorBillingSummary.credit.toLocaleString('en-US')}`,
+        valueVariant: 'metric',
+      },
+      {
+        key: 'projects',
+        title: 'Projects',
+        value: eorBillingSummary.projectCount.toLocaleString('en-US'),
+        valueVariant: 'metric',
+      },
+    ],
+    [eorBillingSummary],
+  );
+
+  const eorBillingPeriods = useMemo(() => {
+    const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
+      .filter(({ month }) => monthInRange(month, normalizedMonthRange))
+      .map(({ i }) => i);
+    return indices.map((i) => PERIODS[i] ?? DEMO_MONTHS[i]!.format('MMM YY'));
+  }, [filterScopeKey, normalizedMonthRange]);
+
+  const eorBillingTableData = useMemo(
+    () =>
+      buildEorBillingTableData({
+        rangeStartIdx: eorBillingRange.startIdx,
+        rangeEndIdx: eorBillingRange.endIdx,
+        clientIds: selectedClientIds,
+        salesKeys: activeSalesKeys,
+      }),
+    [
+      activeSalesKeys,
+      eorBillingRange.endIdx,
+      eorBillingRange.startIdx,
+      selectedClientIds,
+      filterScopeKey,
+    ],
+  );
+
   return (
     <DashboardShell selectedMenuKey="billing-dashboard">
       <div className="revenue-analytics-page">
@@ -1222,56 +1306,53 @@ export default function SalesRevenueAnalyticsPage() {
           styles={{ body: { padding: '16px 18px 14px' } }}
         >
           <div className="revenue-analytics-page__filters-inner">
-            <div className="revenue-analytics-page__filters-date-group">
-              <MonthRangePicker
-                value={monthRange}
-                activePreset={activePreset}
-                referenceDate={REPORTING_END}
-                onChange={(next, preset) => {
-                  setMonthRange(normalizeMonthRange(next));
-                  setActivePreset(preset ?? null);
-                }}
+            <div className="revenue-analytics-page__filters-left">
+              <div className="revenue-analytics-page__filters-date-group">
+                <MonthRangePicker
+                  value={monthRange}
+                  activePreset={activePreset}
+                  referenceDate={REPORTING_END}
+                  onChange={(next, preset) => {
+                    setMonthRange(normalizeMonthRange(next));
+                    setActivePreset(preset ?? null);
+                  }}
+                />
+                <span className="revenue-analytics-page__filters-divider" aria-hidden />
+              </div>
+              <Select
+                mode="multiple"
+                allowClear
+                className="analytics-toolbar-select"
+                value={selectedClientIds}
+                onChange={(values) => setSelectedClientIds(values as ClientFilter)}
+                options={clientSelectOptions}
+                placeholder="All Client"
+                maxTagCount={1}
+                maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+                suffixIcon={pillSuffix}
+                popupMatchSelectWidth={false}
               />
-              <span className="revenue-analytics-page__filters-divider" aria-hidden />
-            </div>
-            <Select
-              mode="multiple"
-              allowClear
-              className="analytics-toolbar-select"
-              value={selectedClientIds}
-              onChange={(values) => setSelectedClientIds(values as ClientFilter)}
-              options={clientSelectOptions}
-              placeholder="All Client"
-              maxTagCount={1}
-              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-              suffixIcon={pillSuffix}
-              popupMatchSelectWidth={false}
-            />
-            <Select
-              mode="multiple"
-              allowClear
-              className="analytics-toolbar-select"
-              value={selectedSalesKeys}
-              onChange={(values) => setSelectedSalesKeys(values as SalesFilter)}
-              options={salesSelectOptions}
-              placeholder="All Sales"
-              maxTagCount={1}
-              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-              suffixIcon={pillSuffix}
-              popupMatchSelectWidth={false}
-            />
-            <div className="revenue-analytics-page__eor-filter">
-              <Switch
-                checked={eorOnly}
-                onChange={setEorOnly}
-                aria-label="EOR projects only"
+              <Select
+                mode="multiple"
+                allowClear
+                className="analytics-toolbar-select"
+                value={selectedSalesKeys}
+                onChange={(values) => setSelectedSalesKeys(values as SalesFilter)}
+                options={salesSelectOptions}
+                placeholder="All Sales"
+                maxTagCount={1}
+                maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+                suffixIcon={pillSuffix}
+                popupMatchSelectWidth={false}
               />
-              <span className="revenue-analytics-page__eor-filter-label">EOR projects only</span>
             </div>
+            <RevenueAnalyticsSectionTabs value={analyticsSection} onChange={setAnalyticsSection} />
           </div>
         </Card>
         </div>
 
+        {analyticsSection === 'revenue-analytic' ? (
+          <>
         <AnalyticsStatBar
           items={statItems}
           className={eorOnly ? 'analytics-stat-bar--eor-only' : undefined}
@@ -1556,6 +1637,40 @@ export default function SalesRevenueAnalyticsPage() {
           clientScopeLabel={clientScopeLabel}
           revenueOnly={eorOnly}
         />
+          </>
+        ) : (
+          <>
+            <AnalyticsStatBar
+              items={eorBillingStatItems}
+              className="analytics-stat-bar--eor-billing"
+            />
+            <EorBillingTrendChartCard
+              filterScopeKey={filterScopeKey}
+              rangeStartIdx={eorBillingRange.startIdx}
+              rangeEndIdx={eorBillingRange.endIdx}
+              selectedClientIds={selectedClientIds}
+              selectedSalesKeys={activeSalesKeys}
+            />
+            <EorBillingOverviewChartCard
+              filterScopeKey={filterScopeKey}
+              rangeStartIdx={eorBillingRange.startIdx}
+              rangeEndIdx={eorBillingRange.endIdx}
+              selectedClientIds={selectedClientIds}
+              selectedSalesKeys={activeSalesKeys}
+            />
+            <EorBillingBreakdownTable
+              filterScopeKey={filterScopeKey}
+              rangeStartIdx={eorBillingRange.startIdx}
+              rangeEndIdx={eorBillingRange.endIdx}
+              selectedClientIds={selectedClientIds}
+              selectedSalesKeys={activeSalesKeys}
+              periods={eorBillingPeriods}
+              clientRows={eorBillingTableData.clients}
+              periodTotals={eorBillingTableData.periodTotals}
+              grandTotal={eorBillingTableData.grandTotal}
+            />
+          </>
+        )}
       </div>
     </DashboardShell>
   );
