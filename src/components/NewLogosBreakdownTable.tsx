@@ -258,14 +258,19 @@ export function NewLogosBreakdownTable({
       style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
       styles={{ body: { padding: '18px 18px 18px' } }}
     >
-      <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-        New Logos
-        {!revenueOnly && clientScopeLabel ? (
-          <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
-            · {clientScopeLabel}
-          </Text>
-        ) : null}
-      </Title>
+      <div style={{ marginBottom: 12 }}>
+        <Title level={5} style={{ marginTop: 0, marginBottom: 0 }}>
+          New Logos
+          {!revenueOnly && clientScopeLabel ? (
+            <Text type="secondary" style={{ fontWeight: 400, marginLeft: 6 }}>
+              · {clientScopeLabel}
+            </Text>
+          ) : null}
+        </Title>
+        <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
+          Sorted by newest projects first
+        </Text>
+      </div>
       <div className="analytics-revenue-table-scroll">
         <Table<DisplayRow>
           key={filterScopeKey}

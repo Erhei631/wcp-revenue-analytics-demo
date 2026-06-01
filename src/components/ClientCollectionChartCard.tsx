@@ -643,7 +643,7 @@ export function ClientCollectionChartCard({
       style={{ borderRadius: 8, marginBottom: 20, borderColor: '#f0f0f0' }}
       styles={{ body: { padding: '18px 18px 18px' } }}
     >
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {drillGroup && !drillFromFilter ? (
             <Button
