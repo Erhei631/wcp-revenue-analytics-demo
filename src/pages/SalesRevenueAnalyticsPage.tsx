@@ -1150,10 +1150,15 @@ export default function SalesRevenueAnalyticsPage() {
           valueVariant: 'metric',
         },
         {
-          key: 'cash',
-          title: 'Cash',
-          valueBreakdown: { paid: cashBreakdown.paid, unpaid: cashBreakdown.unpaid },
-          value: `$${cashBreakdown.cash.toLocaleString('en-US')}`,
+          key: 'paid',
+          title: 'Paid',
+          value: `$${cashBreakdown.paid.toLocaleString('en-US')}`,
+          valueVariant: 'metric',
+        },
+        {
+          key: 'unpaid',
+          title: 'Unpaid',
+          value: `$${cashBreakdown.unpaid.toLocaleString('en-US')}`,
           valueVariant: 'metric',
         },
       );
