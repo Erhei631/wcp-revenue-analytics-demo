@@ -13,12 +13,9 @@ type RevenueAnalyticsSummaryPanelProps = {
   totalRevenueLabel?: string;
   breakdown: ServiceFeeBreakdown;
   eorOnly?: boolean;
-  isSingleRep: boolean;
-  shareOfTeam: number | null;
   topRepName: string;
   topRepValue: number;
   topRepMeta: RepMeta | null;
-  viewTotal: number;
   presaleEffort: number;
 };
 
@@ -52,12 +49,9 @@ export function RevenueAnalyticsSummaryPanel({
   totalRevenueLabel = 'Total Revenue',
   breakdown,
   eorOnly = false,
-  isSingleRep,
-  shareOfTeam,
   topRepName,
   topRepValue,
   topRepMeta,
-  viewTotal,
   presaleEffort,
 }: RevenueAnalyticsSummaryPanelProps) {
   const presaleFormatted = presaleEffort.toLocaleString('en-US', {
@@ -96,34 +90,24 @@ export function RevenueAnalyticsSummaryPanel({
       </div>
 
       <div className="revenue-analytics-summary__card revenue-analytics-summary__card--rep">
-        <div className="revenue-analytics-summary__title">
-          {isSingleRep ? 'Share of team' : 'Top Sales Rep'}
-        </div>
+        <div className="revenue-analytics-summary__title">Top Sales Rep</div>
         <div className="revenue-analytics-summary__metric">
-          {isSingleRep ? (
+          <div className="revenue-analytics-summary__rep">
+            {topRepMeta ? (
+              <Avatar
+                size={32}
+                src={topRepMeta.avatarUrl}
+                alt={topRepMeta.name}
+                style={{ flexShrink: 0, backgroundColor: topRepMeta.color, border: '1px solid #f0f0f0' }}
+              >
+                {personInitials(topRepMeta.name)}
+              </Avatar>
+            ) : null}
             <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
-              {shareOfTeam ?? 0}%
+              {topRepName}
             </span>
-          ) : (
-            <div className="revenue-analytics-summary__rep">
-              {topRepMeta ? (
-                <Avatar
-                  size={32}
-                  src={topRepMeta.avatarUrl}
-                  alt={topRepMeta.name}
-                  style={{ flexShrink: 0, backgroundColor: topRepMeta.color, border: '1px solid #f0f0f0' }}
-                >
-                  {personInitials(topRepMeta.name)}
-                </Avatar>
-              ) : null}
-              <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
-                {topRepName}
-              </span>
-            </div>
-          )}
-          <span className="revenue-analytics-summary__side">
-            {formatMoneyValue(isSingleRep ? viewTotal : topRepValue)}
-          </span>
+          </div>
+          <span className="revenue-analytics-summary__side">{formatMoneyValue(topRepValue)}</span>
         </div>
       </div>
 

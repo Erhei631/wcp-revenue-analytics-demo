@@ -754,6 +754,19 @@ export default function SalesRevenueAnalyticsPage() {
     [eorOnly, monthEndKey, monthStartKey, rangeLabel, selectedClientIds, selectedSalesKeys],
   );
 
+  /** Full-team rep totals for Top Sales Rep card (ignores sales filter). */
+  const teamScopedView = useMemo(
+    () =>
+      buildResolvedView(
+        monthRangeFromKeys(monthStartKey, monthEndKey),
+        selectedClientIds,
+        [],
+        rangeLabel,
+        eorOnly,
+      ),
+    [eorOnly, monthEndKey, monthStartKey, rangeLabel, selectedClientIds],
+  );
+
   const isAllReps = isAllSalesSelected(selectedSalesKeys);
   const isSingleRep = selectedSalesKeys.length === 1;
   const activeSalesKeys = useMemo(
@@ -964,13 +977,15 @@ export default function SalesRevenueAnalyticsPage() {
   }, [eorOnly, totalTrendData]);
 
   const topRep = useMemo(() => {
-    const candidates = isAllReps
-      ? tableRows
-      : tableRows.filter((r) => activeSalesKeys.includes(r.key));
-    if (candidates.length === 0) return { key: null as RepKey | null, name: '—', value: 0 };
-    const best = candidates.reduce((a, b) => (b.total > a.total ? b : a));
-    return { key: best.key, name: best.name, value: best.total };
-  }, [activeSalesKeys, isAllReps, tableRows]);
+    let best = { key: null as RepKey | null, name: '—', value: 0 };
+    for (const r of REP_DEFS) {
+      const total = teamScopedView.byRep[r.key].reduce((sum, v) => sum + coerceAmount(v), 0);
+      if (total > best.value) {
+        best = { key: r.key, name: r.name, value: total };
+      }
+    }
+    return best;
+  }, [teamScopedView.byRep]);
 
   const topRepMeta = useMemo(
     () => (topRep.key ? REP_DEFS.find((r) => r.key === topRep.key) ?? null : null),
@@ -1102,9 +1117,6 @@ export default function SalesRevenueAnalyticsPage() {
     () => newLogoClientRows.reduce((sum, row) => sum + row.total, 0),
     [newLogoClientRows],
   );
-
-  const shareOfTeam =
-    isSingleRep && viewTotal > 0 ? Math.round((primaryTotal / viewTotal) * 1000) / 10 : null;
 
   const presaleEffort = useMemo(() => {
     const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
@@ -1275,12 +1287,9 @@ export default function SalesRevenueAnalyticsPage() {
           totalRevenueLabel={eorOnly ? 'EOR Revenue' : 'Total Revenue'}
           breakdown={cashBreakdown}
           eorOnly={eorOnly}
-          isSingleRep={isSingleRep}
-          shareOfTeam={shareOfTeam}
           topRepName={personFirstName(topRep.name)}
           topRepValue={topRep.value}
           topRepMeta={topRepMeta}
-          viewTotal={viewTotal}
           presaleEffort={presaleEffort}
         />
 
