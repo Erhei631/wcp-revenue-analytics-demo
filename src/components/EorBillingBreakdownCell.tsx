@@ -1,5 +1,5 @@
 import { Typography } from 'antd';
-import type { EorBillingAmounts } from '../data/eorBillingDemo';
+import { EOR_BILLING_BREAKDOWN_CELL_LABELS, type EorBillingAmounts } from '../data/eorBillingDemo';
 import { formatMoneyValue } from '../utils/moneyFormat';
 
 const { Text } = Typography;
@@ -12,6 +12,19 @@ function moneyShort(n: number) {
     return `$${formatted}k`;
   }
   return `$${abs.toLocaleString('en-US')}`;
+}
+
+function FeeCellPartRow({ label, amount }: { label: string; amount: string }) {
+  return (
+    <div className="analytics-revenue-fee-cell__part">
+      <Text type="secondary" className="analytics-revenue-fee-cell__label">
+        {label}
+      </Text>
+      <Text type="secondary" className="analytics-revenue-fee-cell__amount">
+        {amount}
+      </Text>
+    </div>
+  );
 }
 
 type EorBillingBreakdownCellProps = {
@@ -38,15 +51,18 @@ export function EorBillingBreakdownCell({
       <Text strong={!muted} type={tone} className="analytics-revenue-fee-cell__total">
         {formatMoneyValue(total)}
       </Text>
-      <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Service Fee {moneyShort(amounts.serviceFeeRevenue)}
-      </Text>
-      <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Cost {moneyShort(amounts.costs)}
-      </Text>
-      <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Credit {moneyShort(amounts.credit)}
-      </Text>
+      <FeeCellPartRow
+        label={EOR_BILLING_BREAKDOWN_CELL_LABELS.serviceFee}
+        amount={moneyShort(amounts.serviceFeeRevenue)}
+      />
+      <FeeCellPartRow
+        label={EOR_BILLING_BREAKDOWN_CELL_LABELS.costs}
+        amount={moneyShort(amounts.costs)}
+      />
+      <FeeCellPartRow
+        label={EOR_BILLING_BREAKDOWN_CELL_LABELS.deposit}
+        amount={moneyShort(amounts.credit)}
+      />
     </div>
   );
 }

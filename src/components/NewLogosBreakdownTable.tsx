@@ -17,7 +17,7 @@ import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
 const { Text, Title } = Typography;
 
 const NAME_COL_WIDTH = 280;
-const PERIOD_COL_WIDTH = 112;
+const PERIOD_COL_WIDTH = 124;
 const TOTAL_COL_WIDTH = 140;
 
 export type NewLogoClientRow = {
@@ -219,6 +219,7 @@ export function NewLogosBreakdownTable({
                 muted
                 showZeroAmount
                 revenueOnly={revenueOnly}
+                eorProject={record.eor}
               />
             );
           }
@@ -241,6 +242,7 @@ export function NewLogosBreakdownTable({
                 muted
                 showZeroAmount
                 revenueOnly={revenueOnly}
+                eorProject={record.eor}
               />
             );
           }

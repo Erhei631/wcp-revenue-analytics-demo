@@ -35,8 +35,8 @@ import {
   type MonthRangeValue,
   type QuickPresetKey,
 } from '../components/MonthRangePicker';
-import { AnalyticsStatBar, type AnalyticsStatItem } from '../components/AnalyticsStatBar';
 import { RevenueAnalyticsSummaryPanel } from '../components/RevenueAnalyticsSummaryPanel';
+import { EorBillingSummaryPanel } from '../components/EorBillingSummaryPanel';
 import {
   DEMO_MONTH_COUNT,
   DEMO_MONTHS,
@@ -52,6 +52,7 @@ import {
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import { COLLECTION_CLIENT_GROUPS } from '../data/collectionClientDemo';
 import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
+import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
 import {
   isNewLogoClientInRange,
   isNewLogoClientZeroRevenue,
@@ -60,7 +61,6 @@ import {
   projectsForNewLogoClient,
 } from '../data/newLogoDemo';
 import { RevenueByClientRankList } from '../components/RevenueByClientRankList';
-import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
 import {
   buildClientMonthlyFromReps,
   computeRangeChangePct,
@@ -92,7 +92,7 @@ import {
   isClientInEorScope,
   scaleAmountForEor,
 } from '../data/eorProjectDemo';
-import { summarizeEorBilling, buildEorBillingTableData } from '../data/eorBillingDemo';
+import { buildEorBillingTableData, summarizeEorBilling } from '../data/eorBillingDemo';
 import { EorBillingOverviewChartCard } from '../components/EorBillingOverviewChartCard';
 import { EorBillingTrendChartCard } from '../components/EorBillingTrendChartCard';
 import { EorBillingBreakdownTable } from '../components/EorBillingBreakdownTable';
@@ -832,7 +832,7 @@ export default function SalesRevenueAnalyticsPage() {
         title: 'Sales Representative',
         dataIndex: 'name',
         key: 'name',
-        width: 280,
+        width: REVENUE_BREAKDOWN_NAME_COL_WIDTH,
         render: (name: string, record) => {
           if (record.rowType === 'client') {
             return (
@@ -866,7 +866,7 @@ export default function SalesRevenueAnalyticsPage() {
               >
                 {personInitials(name)}
               </Avatar>
-              <Text>{name}</Text>
+              <Text className="analytics-revenue-table__name">{name}</Text>
             </Space>
           );
         },
@@ -895,7 +895,7 @@ export default function SalesRevenueAnalyticsPage() {
         title: 'Grand Total',
         key: 'total',
         align: 'right' as const,
-        width: 140,
+        width: REVENUE_BREAKDOWN_TOTAL_COL_WIDTH,
         render: (_: unknown, record: DisplayRow) => {
           if (record.rowType === 'client') {
             return (
@@ -911,7 +911,7 @@ export default function SalesRevenueAnalyticsPage() {
         },
       },
     ],
-    [eorOnly, expandedRepKeys, filterScopeKey, selectedClientIds, toggleRepExpanded, view.periods],
+    [eorOnly, expandedRepKeys, selectedClientIds, view.periods],
   );
 
   const multiChartMax = useMemo(
@@ -1153,45 +1153,15 @@ export default function SalesRevenueAnalyticsPage() {
     [activeSalesKeys, eorBillingRange.endIdx, eorBillingRange.startIdx, selectedClientIds],
   );
 
-  const eorBillingStatItems = useMemo<AnalyticsStatItem[]>(
-    () => {
-      const eorTotal =
-        eorBillingSummary.serviceFeeRevenue + eorBillingSummary.costs + eorBillingSummary.credit;
-
-      return [
-      {
-        key: 'eor-total',
-        title: 'EOR Total',
-        value: `$${eorTotal.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'service-fee-revenue',
-        title: 'Service Fee',
-        value: `$${eorBillingSummary.serviceFeeRevenue.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'costs',
-        title: 'Cost',
-        value: `$${eorBillingSummary.costs.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'credit',
-        title: 'Credit',
-        value: `$${eorBillingSummary.credit.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-      {
-        key: 'projects',
-        title: 'Projects',
-        value: eorBillingSummary.projectCount.toLocaleString('en-US'),
-        valueVariant: 'metric',
-      },
-    ];
-    },
-    [eorBillingSummary],
+  const eorSecurityDepositAllTime = useMemo(
+    () =>
+      summarizeEorBilling({
+        rangeStartIdx: 0,
+        rangeEndIdx: DEMO_MONTH_COUNT - 1,
+        clientIds: selectedClientIds,
+        salesKeys: activeSalesKeys,
+      }).credit,
+    [activeSalesKeys, selectedClientIds],
   );
 
   const eorBillingPeriods = useMemo(() => {
@@ -1596,9 +1566,9 @@ export default function SalesRevenueAnalyticsPage() {
           </>
         ) : (
           <>
-            <AnalyticsStatBar
-              items={eorBillingStatItems}
-              className="analytics-stat-bar--eor-billing"
+            <EorBillingSummaryPanel
+              summary={eorBillingSummary}
+              securityDepositAllTime={eorSecurityDepositAllTime}
             />
             <EorBillingTrendChartCard
               filterScopeKey={filterScopeKey}

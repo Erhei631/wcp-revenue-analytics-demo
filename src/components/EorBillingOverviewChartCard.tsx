@@ -17,6 +17,9 @@ import {
   buildEorBillingClientChartRows,
   buildEorBillingProjectChartRows,
   eorBillingClientLabel,
+  EOR_BILLING_ITEM_LABELS,
+  EOR_BILLING_SECTION_LABELS,
+  EOR_BILLING_TABLE_LABELS,
   type EorBillingChartRow,
 } from '../data/eorBillingDemo';
 import { DEMO_CLIENT_IDS, type DemoClientId } from '../data/demoClientCatalog';
@@ -137,27 +140,27 @@ function EorBillingTooltip({
       <div className="collection-tooltip__row">
         <span className="collection-tooltip__row-label">
           <span className="collection-tooltip__dot" style={{ background: EOR_SERVICE_FEE }} />
-          Service Fee
+          {EOR_BILLING_ITEM_LABELS.serviceFee}
         </span>
         <strong>{formatMoneyValue(row.serviceFeeRevenue)}</strong>
       </div>
       <div className="collection-tooltip__row">
         <span className="collection-tooltip__row-label">
           <span className="collection-tooltip__dot" style={{ background: EOR_COSTS }} />
-          Cost
+          {EOR_BILLING_ITEM_LABELS.passThroughCosts}
         </span>
         <strong>{formatMoneyValue(row.costs)}</strong>
       </div>
       <div className="collection-tooltip__row">
         <span className="collection-tooltip__row-label">
           <span className="collection-tooltip__dot" style={{ background: EOR_CREDIT }} />
-          Credit
+          {EOR_BILLING_ITEM_LABELS.securityDeposit}
         </span>
         <strong>{formatMoneyValue(row.credit)}</strong>
       </div>
       <div className="collection-tooltip__divider" aria-hidden />
       <div className="collection-tooltip__row">
-        <span>Total</span>
+        <span>{EOR_BILLING_TABLE_LABELS.total}</span>
         <strong>{formatMoneyValue(row.total)}</strong>
       </div>
     </div>
@@ -246,7 +249,7 @@ export function EorBillingOverviewChartCard({
         styles={{ body: { padding: '18px 18px 18px' } }}
       >
         <Title level={5} style={{ marginTop: 0, marginBottom: 8 }}>
-          Client Overview
+          {EOR_BILLING_SECTION_LABELS.clientOverview}
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>
           No EOR clients match the current filters in this view.
@@ -289,7 +292,7 @@ export function EorBillingOverviewChartCard({
                 ) : null}
               </span>
             ) : (
-              'Client Overview'
+              EOR_BILLING_SECTION_LABELS.clientOverview
             )}
           </Title>
         </div>
@@ -341,7 +344,7 @@ export function EorBillingOverviewChartCard({
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
               <Bar
                 dataKey="serviceFeeRevenue"
-                name="Service Fee"
+                name={EOR_BILLING_ITEM_LABELS.serviceFee}
                 fill={EOR_SERVICE_FEE}
                 stackId="eor"
                 barSize={barLayout.barSize}
@@ -354,7 +357,7 @@ export function EorBillingOverviewChartCard({
               />
               <Bar
                 dataKey="costs"
-                name="Cost"
+                name={EOR_BILLING_ITEM_LABELS.passThroughCosts}
                 fill={EOR_COSTS}
                 stackId="eor"
                 barSize={barLayout.barSize}
@@ -367,7 +370,7 @@ export function EorBillingOverviewChartCard({
               />
               <Bar
                 dataKey="credit"
-                name="Credit"
+                name={EOR_BILLING_ITEM_LABELS.securityDeposit}
                 fill={EOR_CREDIT}
                 stackId="eor"
                 radius={[4, 4, 0, 0]}

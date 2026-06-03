@@ -30,10 +30,18 @@ function personInitials(name: string) {
   return (parts[0]?.slice(0, 2) ?? '—').toUpperCase();
 }
 
-function DetailMetric({ label, amount }: { label: string; amount: number }) {
+function BreakdownMetric({
+  label,
+  amount,
+  size = 'lg',
+}: {
+  label: string;
+  amount: number;
+  size?: 'lg' | 'sm';
+}) {
   return (
-    <span className="revenue-analytics-summary__detail-metric">
-      <span className="revenue-analytics-summary__detail-label">{label}</span>
+    <span className={`revenue-analytics-summary__breakdown-metric revenue-analytics-summary__breakdown-metric--${size}`}>
+      <span className="revenue-analytics-summary__breakdown-label">{label}</span>
       <strong>{formatMoneyValue(amount)}</strong>
     </span>
   );
@@ -65,72 +73,67 @@ export function RevenueAnalyticsSummaryPanel({
           : 'revenue-analytics-summary'
       }
     >
-      <div className="revenue-analytics-summary__cards">
-        <div className="revenue-analytics-summary__card">
+      <div className="revenue-analytics-summary__card revenue-analytics-summary__card--revenue">
+        <div className="revenue-analytics-summary__revenue-main">
           <div className="revenue-analytics-summary__title">{totalRevenueLabel}</div>
-          <div className="revenue-analytics-summary__metric revenue-analytics-summary__metric--solo">
-            <span className="revenue-analytics-summary__value">{formatMoneyValue(totalRevenue)}</span>
-          </div>
-        </div>
-
-        <div className="revenue-analytics-summary__card">
-          <div className="revenue-analytics-summary__title">
-            {isSingleRep ? 'Share of team' : 'Top Sales Rep'}
-          </div>
-          <div className="revenue-analytics-summary__metric">
-            {isSingleRep ? (
-              <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
-                {shareOfTeam ?? 0}%
-              </span>
-            ) : (
-              <div className="revenue-analytics-summary__rep">
-                {topRepMeta ? (
-                  <Avatar
-                    size={32}
-                    src={topRepMeta.avatarUrl}
-                    alt={topRepMeta.name}
-                    style={{ flexShrink: 0, backgroundColor: topRepMeta.color, border: '1px solid #f0f0f0' }}
-                  >
-                    {personInitials(topRepMeta.name)}
-                  </Avatar>
-                ) : null}
-                <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
-                  {topRepName}
-                </span>
-              </div>
-            )}
-            <span className="revenue-analytics-summary__side">
-              {formatMoneyValue(isSingleRep ? viewTotal : topRepValue)}
-            </span>
-          </div>
+          <div className="revenue-analytics-summary__value">{formatMoneyValue(totalRevenue)}</div>
         </div>
 
         {!eorOnly ? (
-          <div className="revenue-analytics-summary__card">
-            <div className="revenue-analytics-summary__title">Presale Effort</div>
-            <div className="revenue-analytics-summary__metric">
-              <span className="revenue-analytics-summary__value">{presaleFormatted}</span>
-              <span className="revenue-analytics-summary__side">Man/Month</span>
+          <div className="revenue-analytics-summary__breakdown">
+            <div className="revenue-analytics-summary__breakdown-top">
+              <BreakdownMetric label="Cash" amount={breakdown.cash} />
+              <BreakdownMetric label="Equity" amount={breakdown.equity} />
+            </div>
+            <div className="revenue-analytics-summary__breakdown-inset-wrap">
+              <div className="revenue-analytics-summary__breakdown-inset" role="group" aria-label="Cash breakdown">
+                <BreakdownMetric label="Paid" amount={breakdown.paid} size="sm" />
+                <BreakdownMetric label="Unpaid" amount={breakdown.unpaid} size="sm" />
+              </div>
             </div>
           </div>
         ) : null}
       </div>
 
+      <div className="revenue-analytics-summary__card revenue-analytics-summary__card--rep">
+        <div className="revenue-analytics-summary__title">
+          {isSingleRep ? 'Share of team' : 'Top Sales Rep'}
+        </div>
+        <div className="revenue-analytics-summary__metric">
+          {isSingleRep ? (
+            <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
+              {shareOfTeam ?? 0}%
+            </span>
+          ) : (
+            <div className="revenue-analytics-summary__rep">
+              {topRepMeta ? (
+                <Avatar
+                  size={32}
+                  src={topRepMeta.avatarUrl}
+                  alt={topRepMeta.name}
+                  style={{ flexShrink: 0, backgroundColor: topRepMeta.color, border: '1px solid #f0f0f0' }}
+                >
+                  {personInitials(topRepMeta.name)}
+                </Avatar>
+              ) : null}
+              <span className="revenue-analytics-summary__value revenue-analytics-summary__value--person">
+                {topRepName}
+              </span>
+            </div>
+          )}
+          <span className="revenue-analytics-summary__side">
+            {formatMoneyValue(isSingleRep ? viewTotal : topRepValue)}
+          </span>
+        </div>
+      </div>
+
       {!eorOnly ? (
-        <div className="revenue-analytics-summary__detail" role="group" aria-label="Total revenue breakdown">
-          <DetailMetric label="Equity" amount={breakdown.equity} />
-          <span className="revenue-analytics-summary__detail-sep revenue-analytics-summary__detail-sep--pipe" aria-hidden>
-            |
-          </span>
-          <DetailMetric label="Cash" amount={breakdown.cash} />
-          <span className="revenue-analytics-summary__detail-sep revenue-analytics-summary__detail-sep--dot" aria-hidden>
-            ·
-          </span>
-          <DetailMetric label="Paid" amount={breakdown.paid} />
-          <span className="revenue-analytics-summary__detail-sep revenue-analytics-summary__detail-sep--dot" aria-hidden>
-            ·
-          </span>
-          <DetailMetric label="Unpaid" amount={breakdown.unpaid} />
+        <div className="revenue-analytics-summary__card revenue-analytics-summary__card--presale">
+          <div className="revenue-analytics-summary__title">Presale Effort</div>
+          <div className="revenue-analytics-summary__metric">
+            <span className="revenue-analytics-summary__value">{presaleFormatted}</span>
+            <span className="revenue-analytics-summary__side">Man/Month</span>
+          </div>
         </div>
       ) : null}
     </div>

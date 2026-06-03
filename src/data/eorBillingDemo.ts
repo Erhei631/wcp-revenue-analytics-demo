@@ -19,6 +19,54 @@ import {
 } from './newLogoDemo';
 import { coerceAmount } from '../utils/moneyFormat';
 
+/** User-facing labels for EOR billing line items (KPI, charts, tables). */
+export const EOR_BILLING_ITEM_LABELS = {
+  serviceFee: 'EOR Service Fee',
+  passThroughCosts: 'Pass-Through Costs',
+  securityDeposit: 'Security Deposit',
+} as const;
+
+/** Section titles on the EOR Billing tab. */
+export const EOR_BILLING_SECTION_LABELS = {
+  itemsTrend: 'EOR Billing Items Trend',
+  clientOverview: 'Client Overview',
+  breakdown: 'EOR Breakdown',
+} as const;
+
+/** Shared table / summary labels for EOR billing views. */
+export const EOR_BILLING_TABLE_LABELS = {
+  clientName: 'Client Name',
+  grandTotal: 'Grand Total',
+  eorTotal: 'EOR Total',
+  total: 'Total',
+  paid: 'Paid',
+  unpaid: 'Unpaid',
+  projects: 'Projects',
+} as const;
+
+/** Equity / Cash breakdown rows (Revenue Analytics tables). */
+export const FEE_BREAKDOWN_LINE_LABELS = {
+  equity: 'Equity',
+  cash: 'Cash',
+} as const;
+
+/** Short labels for stacked amounts in EOR breakdown table cells. */
+export const EOR_BILLING_BREAKDOWN_CELL_LABELS = {
+  serviceFee: 'Service Fee',
+  costs: 'Costs',
+  deposit: 'Deposit',
+} as const;
+
+/** Tooltip copy for EOR billing KPI titles. */
+export const EOR_BILLING_ITEM_HINTS: Record<keyof typeof EOR_BILLING_ITEM_LABELS, string> = {
+  serviceFee:
+    'The fee charged for EOR services such as employment administration, payroll, and compliance.',
+  passThroughCosts:
+    'Employee-related costs paid on behalf of the client, such as salary, taxes, benefits, and insurance.',
+  securityDeposit:
+    'A refundable deposit collected from the client to cover payroll or unpaid obligations.',
+};
+
 export type EorBillingAmounts = {
   serviceFeeRevenue: number;
   costs: number;

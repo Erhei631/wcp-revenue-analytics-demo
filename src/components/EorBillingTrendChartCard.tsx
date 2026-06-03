@@ -12,7 +12,12 @@ import {
 } from 'recharts';
 import { CHART_PURPLE, THEME_PRIMARY } from '../constants/chartColors';
 import type { DemoRepKey } from '../data/analyticsDemoSeries';
-import { buildEorBillingTrendData } from '../data/eorBillingDemo';
+import {
+  buildEorBillingTrendData,
+  EOR_BILLING_ITEM_LABELS,
+  EOR_BILLING_SECTION_LABELS,
+  EOR_BILLING_TABLE_LABELS,
+} from '../data/eorBillingDemo';
 import type { DemoClientId } from '../data/demoClientCatalog';
 import { formatMoneyValue } from '../utils/moneyFormat';
 
@@ -79,7 +84,7 @@ function EorBillingTrendTooltip({
       ))}
       <div className="collection-tooltip__divider" aria-hidden />
       <div className="collection-tooltip__row">
-        <span>Total</span>
+        <span>{EOR_BILLING_TABLE_LABELS.total}</span>
         <strong>{formatMoneyValue(total)}</strong>
       </div>
     </div>
@@ -123,7 +128,7 @@ export function EorBillingTrendChartCard({
       styles={{ body: { padding: '18px 18px 8px' } }}
     >
       <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
-        EOR Billing Items Trend
+        {EOR_BILLING_SECTION_LABELS.itemsTrend}
       </Title>
       <div style={{ width: '100%', height: 320 }}>
         <ResponsiveContainer key={`eor-trend-${filterScopeKey}`}>
@@ -142,7 +147,7 @@ export function EorBillingTrendChartCard({
             <Line
               type="monotone"
               dataKey="serviceFeeRevenue"
-              name="Service Fee"
+              name={EOR_BILLING_ITEM_LABELS.serviceFee}
               stroke={EOR_SERVICE_FEE}
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: EOR_SERVICE_FEE }}
@@ -151,7 +156,7 @@ export function EorBillingTrendChartCard({
             <Line
               type="monotone"
               dataKey="costs"
-              name="Cost"
+              name={EOR_BILLING_ITEM_LABELS.passThroughCosts}
               stroke={EOR_COSTS}
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: EOR_COSTS }}
@@ -160,7 +165,7 @@ export function EorBillingTrendChartCard({
             <Line
               type="monotone"
               dataKey="credit"
-              name="Credit"
+              name={EOR_BILLING_ITEM_LABELS.securityDeposit}
               stroke={EOR_CREDIT}
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: EOR_CREDIT }}
