@@ -36,6 +36,7 @@ import {
   type QuickPresetKey,
 } from '../components/MonthRangePicker';
 import { AnalyticsStatBar, type AnalyticsStatItem } from '../components/AnalyticsStatBar';
+import { RevenueAnalyticsSummaryPanel } from '../components/RevenueAnalyticsSummaryPanel';
 import {
   DEMO_MONTH_COUNT,
   DEMO_MONTHS,
@@ -1131,76 +1132,6 @@ export default function SalesRevenueAnalyticsPage() {
     <CaretDownFilled style={{ fontSize: 9, color: '#262626', display: 'block' }} />
   );
 
-  const statItems = useMemo<AnalyticsStatItem[]>(() => {
-    const items: AnalyticsStatItem[] = [
-      {
-        key: 'total-revenue',
-        title: eorOnly ? 'EOR Revenue' : 'Total Revenue',
-        value: `$${primaryTotal.toLocaleString('en-US')}`,
-        valueVariant: 'metric',
-      },
-    ];
-
-    if (!eorOnly) {
-      items.push(
-        {
-          key: 'equity',
-          title: 'Equity',
-          value: `$${cashBreakdown.equity.toLocaleString('en-US')}`,
-          valueVariant: 'metric',
-        },
-        {
-          key: 'paid',
-          title: 'Paid',
-          value: `$${cashBreakdown.paid.toLocaleString('en-US')}`,
-          valueVariant: 'metric',
-        },
-        {
-          key: 'unpaid',
-          title: 'Unpaid',
-          value: `$${cashBreakdown.unpaid.toLocaleString('en-US')}`,
-          valueVariant: 'metric',
-        },
-      );
-    }
-
-    items.push({
-      key: 'top-or-share',
-      title: isSingleRep ? 'Share of team' : 'Top Sales Rep',
-      value: isSingleRep ? `${shareOfTeam ?? 0}%` : personFirstName(topRep.name),
-      valueTitle: isSingleRep ? undefined : topRep.name,
-      valueVariant: isSingleRep ? 'metric' : 'person',
-      avatar:
-        !isSingleRep && topRepMeta ? (
-          <Avatar
-            size={32}
-            src={topRepMeta.avatarUrl}
-            alt={topRepMeta.name}
-            style={{ flexShrink: 0, backgroundColor: topRepMeta.color }}
-          >
-            {personInitials(topRepMeta.name)}
-          </Avatar>
-        ) : undefined,
-      rightLabel: isSingleRep ? formatMoneyValue(viewTotal) : formatMoneyValue(topRep.value),
-      rightLabelTone: isSingleRep ? 'positive' : 'default',
-    });
-
-    if (!eorOnly) {
-      items.push({
-        key: 'presale-effort',
-        title: 'Presale Effort',
-        value: presaleEffort.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        unit: 'Man/Month',
-        valueVariant: 'metric',
-      });
-    }
-
-    return items;
-  }, [cashBreakdown, eorOnly, isSingleRep, presaleEffort, primaryTotal, shareOfTeam, topRep, topRepMeta, viewTotal]);
-
   const eorBillingRange = useMemo(() => {
     const indices = DEMO_MONTHS.map((month, i) => ({ month, i }))
       .filter(({ month }) => monthInRange(month, normalizedMonthRange))
@@ -1369,9 +1300,18 @@ export default function SalesRevenueAnalyticsPage() {
 
         {analyticsSection === 'revenue-analytic' ? (
           <>
-        <AnalyticsStatBar
-          items={statItems}
-          className={eorOnly ? 'analytics-stat-bar--eor-only' : undefined}
+        <RevenueAnalyticsSummaryPanel
+          totalRevenue={primaryTotal}
+          totalRevenueLabel={eorOnly ? 'EOR Revenue' : 'Total Revenue'}
+          breakdown={cashBreakdown}
+          eorOnly={eorOnly}
+          isSingleRep={isSingleRep}
+          shareOfTeam={shareOfTeam}
+          topRepName={personFirstName(topRep.name)}
+          topRepValue={topRep.value}
+          topRepMeta={topRepMeta}
+          viewTotal={viewTotal}
+          presaleEffort={presaleEffort}
         />
 
         <Card

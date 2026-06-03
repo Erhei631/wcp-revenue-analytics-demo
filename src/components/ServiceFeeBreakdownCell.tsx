@@ -24,7 +24,7 @@ type ServiceFeeBreakdownCellProps = {
   clientId?: DemoClientId | null;
   profile?: FeeAmountProfile;
   muted?: boolean;
-  /** When true, zero renders as $0 (and Equity/Paid/Unpaid $0) instead of "-". */
+  /** When true, zero renders as $0 (and Equity/Cash/Paid/Unpaid $0) instead of "-". */
   showZeroAmount?: boolean;
   /** EOR projects: show revenue only, no Equity / Cash lines. */
   revenueOnly?: boolean;
@@ -63,10 +63,10 @@ export function ServiceFeeBreakdownCell({
         Equity {moneyShort(fee.equity)}
       </Text>
       <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Paid {moneyShort(fee.paid)}
+        Cash {moneyShort(fee.cash)}
       </Text>
       <Text type="secondary" className="analytics-revenue-fee-cell__part">
-        Unpaid {moneyShort(fee.unpaid)}
+        (Unpaid {moneyShort(fee.unpaid)})
       </Text>
     </div>
   );
