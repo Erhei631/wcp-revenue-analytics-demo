@@ -490,14 +490,28 @@ svg {
 
 .revenue-analytics-summary__breakdown-caret {
   position: absolute;
-  top: -11px;
-  left: 27px;
-  width: 24px;
-  height: 12px;
-  background: #fff;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  /* 60% of 24×12px; center kept at 39px (27 + 12) above Cash/Paid column */
+  top: -5px;
+  left: 32px;
+  width: 14px;
+  height: 7px;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'14'%20height%3D'7'%20viewBox%3D'0%200%2014%207'%3E%3Cpolygon%20fill%3D'%23ffffff'%20points%3D'7%2C0.5%2013.2%2C6.5%200.8%2C6.5'%2F%3E%3Cpath%20fill%3D'none'%20stroke%3D'%23E5E7EB'%20stroke-width%3D'1'%20stroke-linejoin%3D'round'%20d%3D'M7%200.5%20L13.2%206.5%20M7%200.5%20L0.8%206.5'%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-size: 14px 7px;
+  background-position: 0 0;
   z-index: 3;
   pointer-events: none;
+}
+
+.revenue-analytics-summary__breakdown-caret::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 14px;
+  height: 2px;
+  background: #fff;
 }
 
 .revenue-analytics-summary__card--revenue
@@ -509,7 +523,9 @@ svg {
   left: 0;
   right: 16px;
   height: 28px;
+  box-sizing: border-box;
   background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 4px;
   z-index: 0;
   pointer-events: none;
