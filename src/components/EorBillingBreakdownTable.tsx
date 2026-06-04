@@ -6,19 +6,23 @@ import type { DemoRepKey } from '../data/analyticsDemoSeries';
 import {
   projectRowsForEorBillingClient,
   type EorBillingTableClientRow,
-  type EorBillingTableProjectRow,
 } from '../data/eorBillingDemo';
 import type { DemoClientId } from '../data/demoClientCatalog';
-import { EorProjectTag } from './EorProjectTag';
-import { EorBillingBreakdownCell } from './EorBillingBreakdownCell';
-import { formatMoneyValue } from '../utils/moneyFormat';
+import {
+  EOR_BILLING_CLIENT_NAME_COL_WIDTH,
+  EOR_BILLING_PERIOD_COL_MIN_WIDTH,
+  eorBillingTableScrollWidth,
+  REVENUE_GRAND_TOTAL_COL_WIDTH,
+} from '../constants/revenueTableLayout';
+import { expandedProjectTableCellProps } from './RevenueExpandedProjectGrid';
+import { EorBillingExpandedProjectGrid } from './EorBillingExpandedProjectGrid';
+import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
+import {
+  buildEorBillingDetailProjectRow,
+  type EorBillingDetailProjectRow,
+} from '../utils/eorBillingTableDetail';
 
 const { Text, Title } = Typography;
-
-const NAME_COL_WIDTH = 280;
-const PERIOD_COL_WIDTH = 112;
-const TOTAL_COL_WIDTH = 140;
-const PROJECT_NAME_INDENT = 72;
 
 function clientInitials(name: string) {
   const parts = name.replace(/·/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -32,8 +36,11 @@ function clientInitials(name: string) {
 }
 
 type ParentRow = EorBillingTableClientRow & { rowType: 'client' };
-type ChildRow = EorBillingTableProjectRow & { rowType: 'project'; parentKey: DemoClientId };
-type DisplayRow = ParentRow | ChildRow;
+type DisplayRow = ParentRow | EorBillingDetailProjectRow;
+
+function isDetailProjectRow(record: DisplayRow): record is EorBillingDetailProjectRow {
+  return record.rowType === 'detail-project';
+}
 
 type EorBillingBreakdownTableProps = {
   filterScopeKey: string;
@@ -86,105 +93,87 @@ export function EorBillingBreakdownTable({
       rows.push({ ...client, rowType: 'client' });
       if (!expandedClientKeys.includes(client.key)) continue;
       for (const project of projectRowsForEorBillingClient(client.key, filterParams)) {
-        rows.push({ ...project, rowType: 'project', parentKey: client.key });
+        rows.push(buildEorBillingDetailProjectRow(project, client.key));
       }
     }
     return rows;
   }, [clientRows, expandedClientKeys, filterParams]);
 
-  const scrollX = NAME_COL_WIDTH + periods.length * PERIOD_COL_WIDTH + TOTAL_COL_WIDTH;
+  const scrollX = eorBillingTableScrollWidth(periods.length);
+  const columnCount = periods.length + 2;
 
   const columns: TableColumnsType<DisplayRow> = useMemo(
-    () => [
-      {
-        title: 'Client Name',
-        dataIndex: 'name',
-        key: 'name',
-        width: NAME_COL_WIDTH,
-        render: (name: string, record) => {
-          if (record.rowType === 'project') {
+    () => {
+      const projectCellProps = (record: DisplayRow, columnKey: string) =>
+        expandedProjectTableCellProps(record, columnKey, 'name', columnCount);
+
+      return [
+        {
+          title: 'Client Name',
+          dataIndex: 'name',
+          key: 'name',
+          fixed: 'left',
+          width: EOR_BILLING_CLIENT_NAME_COL_WIDTH,
+          onCell: (record) => projectCellProps(record, 'name'),
+          render: (name: string, record) => {
+            if (isDetailProjectRow(record)) {
+              return <EorBillingExpandedProjectGrid record={record} periodCount={periods.length} />;
+            }
+
+            const expanded = expandedClientKeys.includes(record.key);
+
             return (
-              <Space
-                size={6}
-                align="center"
-                style={{ display: 'flex', paddingLeft: PROJECT_NAME_INDENT, fontSize: 13 }}
-                wrap
-              >
-                <Text type="secondary">{name}</Text>
-                <EorProjectTag />
+              <Space size={10} align="start">
+                <span className="analytics-revenue-expand-icon" aria-hidden>
+                  {expanded ? (
+                    <CaretDownOutlined style={{ fontSize: 11 }} />
+                  ) : (
+                    <CaretRightOutlined style={{ fontSize: 11 }} />
+                  )}
+                </span>
+                <Avatar
+                  size={28}
+                  src={record.logoUrl}
+                  alt={name}
+                  style={{ flexShrink: 0, backgroundColor: record.color, border: '1px solid #f0f0f0' }}
+                >
+                  {clientInitials(name)}
+                </Avatar>
+                <div className="analytics-revenue-client-name-block">
+                  <Text className="analytics-revenue-client-name-block__title">{name}</Text>
+                  <Text type="secondary" className="analytics-revenue-client-name-block__sales">
+                    {record.salesName}
+                  </Text>
+                </div>
               </Space>
             );
-          }
-
-          const expanded = expandedClientKeys.includes(record.key);
-
-          return (
-            <Space size={10} align="start">
-              <span className="analytics-revenue-expand-icon" aria-hidden>
-                {expanded ? (
-                  <CaretDownOutlined style={{ fontSize: 11 }} />
-                ) : (
-                  <CaretRightOutlined style={{ fontSize: 11 }} />
-                )}
-              </span>
-              <Avatar
-                size={28}
-                src={record.logoUrl}
-                alt={name}
-                style={{ flexShrink: 0, backgroundColor: record.color, border: '1px solid #f0f0f0' }}
-              >
-                {clientInitials(name)}
-              </Avatar>
-              <div className="analytics-revenue-client-name-block">
-                <Text className="analytics-revenue-client-name-block__title">{name}</Text>
-                <Text type="secondary" className="analytics-revenue-client-name-block__sales">
-                  {record.salesName}
-                </Text>
-              </div>
-            </Space>
-          );
+          },
         },
-      },
-      ...periods.map((period, idx) => ({
-        title: period,
-        key: period,
-        align: 'right' as const,
-        width: PERIOD_COL_WIDTH,
-        render: (_: unknown, record: DisplayRow) => {
-          if (record.rowType === 'project') {
-            return (
-              <EorBillingBreakdownCell
-                amounts={record.monthlyAmounts[idx]!}
-                muted
-                showZeroAmount
-              />
-            );
-          }
-          return <Text>{formatMoneyValue(record.values[idx])}</Text>;
+        ...periods.map((period, idx) => ({
+          title: period,
+          key: period,
+          align: 'right' as const,
+          minWidth: EOR_BILLING_PERIOD_COL_MIN_WIDTH,
+          onCell: (record: DisplayRow) => projectCellProps(record, period),
+          render: (_: unknown, record: DisplayRow) => {
+            if (isDetailProjectRow(record)) return null;
+            return <Text>{formatMoneyValue(coerceAmount(record.values[idx]))}</Text>;
+          },
+        })),
+        {
+          title: 'Grand Total',
+          key: 'total',
+          align: 'right' as const,
+          width: REVENUE_GRAND_TOTAL_COL_WIDTH,
+          onCell: (record) => projectCellProps(record, 'total'),
+          render: (_: unknown, record: DisplayRow) => {
+            if (isDetailProjectRow(record)) return null;
+            return <Text strong>{formatMoneyValue(record.total)}</Text>;
+          },
         },
-      })),
-      {
-        title: 'Grand Total',
-        key: 'total',
-        align: 'right' as const,
-        width: TOTAL_COL_WIDTH,
-        render: (_: unknown, record: DisplayRow) => {
-          if (record.rowType === 'project') {
-            const amounts = record.monthlyAmounts.reduce(
-              (acc, month) => ({
-                serviceFeeRevenue: acc.serviceFeeRevenue + month.serviceFeeRevenue,
-                costs: acc.costs + month.costs,
-                credit: acc.credit + month.credit,
-              }),
-              { serviceFeeRevenue: 0, costs: 0, credit: 0 },
-            );
-            return <EorBillingBreakdownCell amounts={amounts} muted showZeroAmount />;
-          }
-          return <Text strong>{formatMoneyValue(record.total)}</Text>;
-        },
-      },
-    ],
-    [expandedClientKeys, periods],
+      ];
+    },
+    [columnCount, expandedClientKeys, periods],
   );
 
   return (
@@ -199,14 +188,15 @@ export function EorBillingBreakdownTable({
       <div className="analytics-revenue-table-scroll">
         <Table<DisplayRow>
           key={filterScopeKey}
-          className="analytics-revenue-table"
+          className="analytics-revenue-table analytics-revenue-table--eor-billing"
           rowKey="key"
           columns={columns}
+          sticky
           scroll={{ x: scrollX }}
           dataSource={displayRows}
           rowClassName={(record) =>
-            record.rowType === 'project'
-              ? 'analytics-revenue-client-row'
+            isDetailProjectRow(record)
+              ? 'analytics-revenue-expanded-project-row'
               : 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
           }
           onRow={(record) => {
@@ -233,9 +223,9 @@ export function EorBillingBreakdownTable({
             ),
           }}
           summary={() => (
-            <Table.Summary>
-              <Table.Summary.Row style={{ background: 'rgba(70, 155, 255, 0.08)' }}>
-                <Table.Summary.Cell index={0} align="right">
+            <Table.Summary fixed>
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} align="right" className="analytics-revenue-table__summary-first">
                   <Text strong>EOR Total</Text>
                 </Table.Summary.Cell>
                 {periods.map((period, idx) => (

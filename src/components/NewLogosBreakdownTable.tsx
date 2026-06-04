@@ -7,18 +7,27 @@ import {
   isNewLogoEorDemoClient,
   projectRowsForNewLogoClient,
   projectsForNewLogoClient,
-  type NewLogoProjectRow,
 } from '../data/newLogoDemo';
 import type { DemoClientId } from '../data/demoClientCatalog';
-import { EorProjectTag } from './EorProjectTag';
-import { ServiceFeeBreakdownCell } from './ServiceFeeBreakdownCell';
+import {
+  REVENUE_GRAND_TOTAL_COL_WIDTH,
+  REVENUE_PERIOD_COL_MIN_WIDTH,
+  REVENUE_PROJECT_NAME_INDENT,
+  REVENUE_SALES_REP_COL_WIDTH,
+  revenueTableScrollWidth,
+} from '../constants/revenueTableLayout';
+import {
+  expandedProjectTableCellProps,
+  RevenueExpandedProjectGrid,
+} from './RevenueExpandedProjectGrid';
 import { coerceAmount, formatMoneyValue } from '../utils/moneyFormat';
+import {
+  buildRevenueDetailProjectRow,
+  type RevenueDetailProjectRow,
+} from '../utils/revenueTableDetailLines';
 
 const { Text, Title } = Typography;
 
-const NAME_COL_WIDTH = 280;
-const PERIOD_COL_WIDTH = 124;
-const TOTAL_COL_WIDTH = 140;
 
 export type NewLogoClientRow = {
   key: DemoClientId;
@@ -37,7 +46,6 @@ type NoDataRow = {
   parentKey: DemoClientId;
 };
 
-const PROJECT_NAME_INDENT = 72;
 
 function clientInitials(name: string) {
   const parts = name.replace(/·/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -51,8 +59,11 @@ function clientInitials(name: string) {
 }
 
 type ParentRow = NewLogoClientRow & { rowType: 'client' };
-type ChildRow = NewLogoProjectRow & { rowType: 'project'; parentKey: DemoClientId };
-type DisplayRow = ParentRow | ChildRow | NoDataRow;
+type DisplayRow = ParentRow | RevenueDetailProjectRow | NoDataRow;
+
+function isDetailProjectRow(record: DisplayRow): record is RevenueDetailProjectRow {
+  return record.rowType === 'detail-project';
+}
 
 type NewLogosBreakdownTableProps = {
   filterScopeKey: string;
@@ -121,13 +132,26 @@ export function NewLogosBreakdownTable({
         continue;
       }
       for (const project of projectRowsForDisplay(client, revenueOnly)) {
-        rows.push({ ...project, rowType: 'project', parentKey: client.key });
+        const detailRow = buildRevenueDetailProjectRow({
+          rowKeyPrefix: project.key,
+          parentKey: client.key,
+          entityName: project.name,
+            nameIndent: REVENUE_PROJECT_NAME_INDENT,
+          periodValues: project.values,
+          rowTotal: project.total,
+          clientId: project.clientId,
+          showZeroAmount: true,
+          revenueOnly,
+          eorProject: project.eor,
+          showEorTag: project.eor,
+        });
+        if (detailRow) rows.push(detailRow);
       }
     }
     return rows;
   }, [expandedClientKeys, revenueOnly, visibleClientRows]);
 
-  const scrollX = NAME_COL_WIDTH + periods.length * PERIOD_COL_WIDTH + TOTAL_COL_WIDTH;
+  const scrollX = revenueTableScrollWidth(periods.length);
   const columnCount = periods.length + 2;
 
   const columns: TableColumnsType<DisplayRow> = useMemo(
@@ -135,16 +159,22 @@ export function NewLogosBreakdownTable({
       const hideNoDataCell = (record: DisplayRow) =>
         record.rowType === 'no-data' ? { colSpan: 0 } : {};
 
+      const projectCellProps = (record: DisplayRow, columnKey: string) => {
+        if (record.rowType === 'no-data' && columnKey === 'name') {
+          return { colSpan: columnCount, className: 'analytics-revenue-no-data-cell' };
+        }
+        if (record.rowType === 'no-data') return hideNoDataCell(record);
+        return expandedProjectTableCellProps(record, columnKey, 'name', columnCount);
+      };
+
       return [
       {
         title: 'Client Name',
         dataIndex: 'name',
         key: 'name',
-        width: NAME_COL_WIDTH,
-        onCell: (record) =>
-          record.rowType === 'no-data'
-            ? { colSpan: columnCount, className: 'analytics-revenue-no-data-cell' }
-            : {},
+        fixed: 'left',
+        width: REVENUE_SALES_REP_COL_WIDTH,
+        onCell: (record) => projectCellProps(record, 'name'),
         render: (name: string, record) => {
           if (record.rowType === 'no-data') {
             return (
@@ -154,18 +184,8 @@ export function NewLogosBreakdownTable({
             );
           }
 
-          if (record.rowType === 'project') {
-            return (
-              <Space
-                size={6}
-                align="center"
-                style={{ display: 'flex', paddingLeft: PROJECT_NAME_INDENT, fontSize: 13 }}
-                wrap
-              >
-                <Text type="secondary">{name}</Text>
-                {record.eor ? <EorProjectTag /> : null}
-              </Space>
-            );
+          if (isDetailProjectRow(record)) {
+            return <RevenueExpandedProjectGrid record={record} periodCount={periods.length} />;
           }
 
           const expandable = clientRowExpandable(record, revenueOnly);
@@ -206,23 +226,11 @@ export function NewLogosBreakdownTable({
         title: p,
         key: p,
         align: 'right' as const,
-        width: PERIOD_COL_WIDTH,
-        onCell: hideNoDataCell,
+        minWidth: REVENUE_PERIOD_COL_MIN_WIDTH,
+        onCell: (record: DisplayRow) => projectCellProps(record, p),
         render: (_: unknown, record: DisplayRow) => {
-          if (record.rowType === 'no-data') return null;
+          if (record.rowType === 'no-data' || isDetailProjectRow(record)) return null;
           const amount = coerceAmount(record.values[idx]);
-          if (record.rowType === 'project') {
-            return (
-              <ServiceFeeBreakdownCell
-                serviceFeeTotal={amount}
-                clientId={record.clientId}
-                muted
-                showZeroAmount
-                revenueOnly={revenueOnly}
-                eorProject={record.eor}
-              />
-            );
-          }
           return <Text>{formatMoneyValue(amount)}</Text>;
         },
       })),
@@ -230,22 +238,10 @@ export function NewLogosBreakdownTable({
         title: 'Grand Total',
         key: 'total',
         align: 'right' as const,
-        width: TOTAL_COL_WIDTH,
-        onCell: hideNoDataCell,
+        width: REVENUE_GRAND_TOTAL_COL_WIDTH,
+        onCell: (record) => projectCellProps(record, 'total'),
         render: (_: unknown, record: DisplayRow) => {
-          if (record.rowType === 'no-data') return null;
-          if (record.rowType === 'project') {
-            return (
-              <ServiceFeeBreakdownCell
-                serviceFeeTotal={record.total}
-                clientId={record.clientId}
-                muted
-                showZeroAmount
-                revenueOnly={revenueOnly}
-                eorProject={record.eor}
-              />
-            );
-          }
+          if (record.rowType === 'no-data' || isDetailProjectRow(record)) return null;
           return <Text strong>{formatMoneyValue(record.total)}</Text>;
         },
       },
@@ -279,11 +275,15 @@ export function NewLogosBreakdownTable({
           className="analytics-revenue-table"
           rowKey="key"
           columns={columns}
+          sticky
           scroll={{ x: scrollX }}
           dataSource={displayRows}
           rowClassName={(record) => {
-            if (record.rowType === 'project' || record.rowType === 'no-data') {
-              return 'analytics-revenue-client-row';
+            if (isDetailProjectRow(record)) {
+              return 'analytics-revenue-expanded-project-row';
+            }
+            if (record.rowType === 'no-data') {
+              return 'analytics-revenue-detail-row';
             }
             return clientRowExpandable(record, revenueOnly)
               ? 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
@@ -319,9 +319,9 @@ export function NewLogosBreakdownTable({
             ),
           }}
           summary={() => (
-            <Table.Summary>
-              <Table.Summary.Row style={{ background: 'rgba(70, 155, 255, 0.08)' }}>
-                <Table.Summary.Cell index={0} align="right">
+            <Table.Summary fixed>
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} align="right" className="analytics-revenue-table__summary-first">
                   <Text strong>New Logos Total</Text>
                 </Table.Summary.Cell>
                 {periods.map((p, idx) => (

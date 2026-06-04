@@ -248,7 +248,7 @@ svg {
   height: 103px;
   min-height: 103px;
   padding: 14px 20px;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -348,6 +348,7 @@ svg {
   min-width: 0;
   background: #f4f6f9;
   align-self: stretch;
+  overflow: visible;
 }
 
 /* Figma 21137:109538 — 74px breakdown panel */
@@ -400,6 +401,8 @@ svg {
   margin-top: 2px;
   margin-left: -16px;
   box-sizing: border-box;
+  position: relative;
+  z-index: 2;
 }
 
 .revenue-analytics-summary__breakdown:not(.revenue-analytics-summary__breakdown--stacked)
@@ -483,7 +486,18 @@ svg {
 
 .revenue-analytics-summary__breakdown-inset-wrap {
   position: relative;
-  filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.04));
+}
+
+.revenue-analytics-summary__breakdown-caret {
+  position: absolute;
+  top: -11px;
+  left: 27px;
+  width: 24px;
+  height: 12px;
+  background: #fff;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  z-index: 3;
+  pointer-events: none;
 }
 
 .revenue-analytics-summary__card--revenue
@@ -499,19 +513,7 @@ svg {
   border-radius: 4px;
   z-index: 0;
   pointer-events: none;
-}
-
-.revenue-analytics-summary__breakdown-inset-wrap::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 36px;
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 6px solid #fff;
-  z-index: 1;
+  filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.04));
 }
 
 .revenue-analytics-summary__breakdown-inset {
@@ -979,8 +981,100 @@ svg {
 .analytics-revenue-table-scroll {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  /* Horizontal scroll is handled by Ant Table scroll.x — avoid nested scroll breaking fix-left */
+  overflow: visible;
+}
+
+/* Sticky first column (Ant fixed + expanded-row inner area) */
+.analytics-revenue-table .ant-table-cell-fix-left {
+  z-index: 2;
+  overflow: hidden;
+}
+
+.analytics-revenue-table .ant-table-tbody > tr:not(.analytics-revenue-expanded-project-row) > td.ant-table-cell-fix-left,
+.analytics-revenue-table .ant-table-thead > tr > th.ant-table-cell-fix-left {
+  width: var(--client-name-col-width) !important;
+  min-width: var(--client-name-col-width) !important;
+  max-width: var(--client-name-col-width) !important;
+  box-sizing: border-box;
+}
+
+.analytics-revenue-expanded-project-row > td.ant-table-cell-fix-left {
+  overflow: visible;
+  max-width: none !important;
+}
+
+.analytics-revenue-table .ant-table-thead > tr > th.ant-table-cell-fix-left {
+  z-index: 3;
+  background: #dfe5ee !important;
+}
+
+.analytics-revenue-table .ant-table-tbody > tr > td.ant-table-cell-fix-left {
+  background: #fff;
+}
+
+.analytics-revenue-table .ant-table-tbody > tr.analytics-revenue-expanded-project-row > td,
+.analytics-revenue-table .ant-table-tbody > tr.analytics-revenue-detail-row > td {
+  background: #fafafa;
+}
+
+.analytics-revenue-table .ant-table-tbody > tr.analytics-revenue-expanded-project-row > td.ant-table-cell-fix-left,
+.analytics-revenue-table .ant-table-tbody > tr.analytics-revenue-detail-row > td.ant-table-cell-fix-left {
+  background: #fafafa;
+}
+
+.analytics-revenue-table tr.analytics-revenue-rep-row--expandable:hover > td.ant-table-cell-fix-left {
+  background: #fafafa !important;
+}
+
+.analytics-revenue-table .ant-table-cell-fix-left-first::after {
+  box-shadow: inset 10px 0 8px -8px rgba(0, 0, 0, 0.12);
+}
+
+.analytics-revenue-expanded-project-row .analytics-revenue-expanded-project__client-area--split {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #fafafa;
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* Summary row: Ant fix-left + Table sticky/fixed summary (scroll sync with body) */
+.analytics-revenue-table .ant-table-summary > tr > td {
+  background: var(--analytics-revenue-summary-bg) !important;
+}
+
+.analytics-revenue-table .ant-table-summary .ant-table-cell-fix-left,
+.analytics-revenue-table .ant-table-summary .analytics-revenue-table__summary-first {
+  position: relative;
+  isolation: isolate;
+  z-index: 5;
+  width: var(--client-name-col-width) !important;
+  min-width: var(--client-name-col-width) !important;
+  max-width: var(--client-name-col-width) !important;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--analytics-revenue-summary-bg) !important;
+}
+
+.analytics-revenue-table .ant-table-summary .ant-table-cell-fix-left-last::after {
+  box-shadow: inset 10px 0 8px -8px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-revenue-table div.ant-table-summary {
+  overflow: hidden;
+}
+
+.analytics-revenue-table div.ant-table-summary .ant-table-cell-fix-left {
+  z-index: 5;
+  background: var(--analytics-revenue-summary-bg) !important;
+}
+
+.analytics-revenue-table .ant-table-summary .analytics-revenue-table__summary-first .ant-typography {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .analytics-revenue-table-scroll .analytics-revenue-table .ant-table-wrapper {
@@ -991,18 +1085,286 @@ svg {
   background: #dfe5ee !important;
 }
 
+.analytics-revenue-table {
+  /* Opaque tint matching rgba(70, 155, 255, 0.08) on white — required for fix-left scroll overlap */
+  --analytics-revenue-summary-bg: #f0f7ff;
+  --sales-rep-col-width: 300px;
+  --client-name-col-width: var(--sales-rep-col-width);
+  --project-name-width: 180px;
+  --project-info-width: var(--project-name-width);
+  --metric-label-width: 120px;
+  --project-info-metric-gap: 2px;
+  --project-name-indent: 48px;
+  --period-col-min: 160px;
+  --grand-total-min: 180px;
+  --grand-total-max: 220px;
+  /* legacy aliases */
+  --client-name-area-width: var(--client-name-col-width);
+  --period-col-width: var(--period-col-min);
+  --grand-total-width: var(--grand-total-max);
+}
+
+/* Revenue / New Logos: split project info + metric labels (same pattern as EOR) */
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing) .ant-table-thead > tr > th:first-child,
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing)
+  .ant-table-tbody
+  > tr:not(.analytics-revenue-expanded-project-row)
+  > td:first-child,
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing) .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing)
+  .ant-table-tbody
+  > tr:not(.analytics-revenue-expanded-project-row)
+  > td.ant-table-cell-fix-left {
+  width: var(--client-name-col-width) !important;
+  min-width: var(--client-name-col-width) !important;
+  max-width: var(--client-name-col-width) !important;
+}
+
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing)
+  .analytics-revenue-expanded-project__client-area--split {
+  grid-template-columns: var(--project-info-width) var(--metric-label-width);
+  column-gap: 0;
+  width: var(--client-name-col-width);
+  min-width: var(--client-name-col-width);
+  max-width: var(--client-name-col-width);
+  overflow: hidden;
+  background: #fafafa;
+  border-right: 1px solid #f0f0f0;
+  box-sizing: border-box;
+}
+
+.analytics-revenue-table:not(.analytics-revenue-table--eor-billing)
+  .analytics-revenue-expanded-project-row
+  .analytics-revenue-expanded-project__client-area--split {
+  width: var(--client-name-col-width);
+  min-width: var(--client-name-col-width);
+  max-width: var(--client-name-col-width);
+}
+
+/* EOR Breakdown: one --client-name-col-width for header, parent row, expanded row */
+.analytics-revenue-table--eor-billing {
+  --client-name-col-width: 330px;
+  --project-info-width: 200px;
+  --metric-label-width: 130px;
+  --project-info-metric-gap: 2px;
+  --sales-rep-col-width: var(--client-name-col-width);
+  --client-name-area-width: var(--client-name-col-width);
+  --project-name-width: var(--project-info-width);
+  --project-name-indent: 26px;
+  --period-col-min: 150px;
+}
+
+.analytics-revenue-table--eor-billing .ant-table-thead > tr > th:first-child,
+.analytics-revenue-table--eor-billing
+  .ant-table-tbody
+  > tr:not(.analytics-revenue-expanded-project-row)
+  > td:first-child,
+.analytics-revenue-table--eor-billing .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.analytics-revenue-table--eor-billing
+  .ant-table-tbody
+  > tr:not(.analytics-revenue-expanded-project-row)
+  > td.ant-table-cell-fix-left {
+  width: var(--client-name-col-width) !important;
+  min-width: var(--client-name-col-width) !important;
+  max-width: var(--client-name-col-width) !important;
+}
+
+@media (max-width: 1280px) {
+  .analytics-revenue-table--eor-billing {
+    --client-name-col-width: clamp(300px, 28vw, 330px);
+    --project-info-width: calc(var(--client-name-col-width) - var(--metric-label-width));
+  }
+}
+
+.analytics-revenue-table--eor-billing .analytics-revenue-expanded-project__client-area--split {
+  grid-template-columns: var(--project-info-width) var(--metric-label-width);
+  column-gap: 0;
+  width: var(--client-name-col-width);
+  min-width: var(--client-name-col-width);
+  max-width: var(--client-name-col-width);
+  overflow: hidden;
+  background: #fafafa;
+  border-right: 1px solid #f0f0f0;
+  box-sizing: border-box;
+}
+
+.analytics-revenue-table--eor-billing
+  .analytics-revenue-expanded-project-row
+  .analytics-revenue-expanded-project__client-area--split {
+  width: var(--client-name-col-width);
+  min-width: var(--client-name-col-width);
+  max-width: var(--client-name-col-width);
+}
+
+/* Shared split-panel rules (Revenue + EOR) */
+.analytics-revenue-expanded-project__client-area--split .analytics-revenue-expanded-project__project-info {
+  width: var(--project-info-width);
+  min-width: var(--project-info-width);
+  max-width: var(--project-info-width);
+  align-self: stretch;
+  height: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: 10px 8px 8px var(--project-name-indent);
+  overflow: visible;
+  border-right: 1px solid #f0f0f0;
+}
+
+.analytics-revenue-expanded-project__client-area--split
+  .analytics-revenue-expanded-project__project-info
+  .analytics-revenue-expanded-project__name-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.analytics-revenue-expanded-project__client-area--split
+  .analytics-revenue-expanded-project__project-info
+  .analytics-revenue-expanded-project__tag {
+  flex: 0 0 auto;
+}
+
+.analytics-revenue-expanded-project__client-area--split .analytics-revenue-expanded-project__metric {
+  justify-content: flex-end;
+  align-items: center;
+  padding-left: var(--project-info-metric-gap);
+  padding-right: 12px;
+  border-right: none;
+}
+
+.analytics-revenue-expanded-project__client-area--split .analytics-revenue-expanded-project__metric-text {
+  display: block;
+  width: 100%;
+  text-align: right;
+  white-space: nowrap;
+  overflow: visible;
+}
+
 .analytics-revenue-table .ant-table-cell {
   padding-left: 12px;
 }
 
-.analytics-revenue-table .analytics-revenue-client-row > td {
-  background: #fafafa;
-  vertical-align: middle;
+.analytics-revenue-table__client-indent {
+  padding-left: var(--project-name-indent);
 }
 
 .analytics-revenue-table .analytics-revenue-detail-row > td {
   background: #fafafa;
   vertical-align: middle;
+}
+
+.analytics-revenue-table .analytics-revenue-expanded-project-row > td {
+  background: #fafafa;
+  padding: 0 !important;
+  vertical-align: top;
+}
+
+.analytics-revenue-table .analytics-revenue-expanded-project-row > td.ant-table-cell {
+  border-color: #f0f0f0;
+}
+
+.analytics-revenue-expanded-project-cell {
+  padding: 0 !important;
+}
+
+
+.analytics-revenue-expanded-project {
+  display: grid;
+  width: 100%;
+  min-width: 100%;
+  background: #fafafa;
+  --border-subtle: #f0f0f0;
+  --text-primary: rgba(0, 0, 0, 0.88);
+  --text-secondary: rgba(0, 0, 0, 0.45);
+}
+
+.analytics-revenue-expanded-project__client-area--split {
+  display: grid;
+  grid-column: 1;
+  box-sizing: border-box;
+}
+
+.analytics-revenue-expanded-project__project-info {
+  display: flex;
+  gap: 6px;
+  grid-column: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.analytics-revenue-expanded-project__name-text {
+  font-size: 13px;
+  line-height: 18px;
+  margin-bottom: 0 !important;
+}
+
+.analytics-revenue-expanded-project__tag {
+  flex-shrink: 0;
+}
+
+.analytics-revenue-expanded-project__metric {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 26px;
+  padding: 4px 20px 4px 8px;
+  box-sizing: border-box;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  width: var(--metric-label-width);
+  min-width: var(--metric-label-width);
+  max-width: var(--metric-label-width);
+}
+
+.analytics-revenue-expanded-project__amount {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 26px;
+  padding: 4px 12px;
+  box-sizing: border-box;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  min-width: var(--period-col-min);
+}
+
+.analytics-revenue-expanded-project__amount--grand-total {
+  min-width: var(--grand-total-min);
+}
+
+.analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__amount-text {
+  margin-bottom: 0 !important;
+  font-size: 11px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.analytics-revenue-expanded-project__metric--total .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__amount--total .analytics-revenue-expanded-project__amount-text {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-primary);
+}
+
+.analytics-revenue-expanded-project__metric--equity .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__metric--cash .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__metric--costs .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__metric--deposit .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__metric--service-fee .analytics-revenue-expanded-project__metric-text,
+.analytics-revenue-expanded-project__amount--equity .analytics-revenue-expanded-project__amount-text,
+.analytics-revenue-expanded-project__amount--cash .analytics-revenue-expanded-project__amount-text,
+.analytics-revenue-expanded-project__amount--costs .analytics-revenue-expanded-project__amount-text,
+.analytics-revenue-expanded-project__amount--deposit .analytics-revenue-expanded-project__amount-text,
+.analytics-revenue-expanded-project__amount--service-fee .analytics-revenue-expanded-project__amount-text {
+  color: var(--text-secondary);
 }
 
 .analytics-revenue-table .ant-avatar .ant-avatar-image img {

@@ -52,9 +52,9 @@ export const FEE_BREAKDOWN_LINE_LABELS = {
 
 /** Short labels for stacked amounts in EOR breakdown table cells. */
 export const EOR_BILLING_BREAKDOWN_CELL_LABELS = {
-  serviceFee: 'Service Fee',
-  costs: 'Costs',
-  deposit: 'Deposit',
+  serviceFee: EOR_BILLING_ITEM_LABELS.serviceFee,
+  costs: EOR_BILLING_ITEM_LABELS.passThroughCosts,
+  deposit: EOR_BILLING_ITEM_LABELS.securityDeposit,
 } as const;
 
 /** Tooltip copy for EOR billing KPI titles. */

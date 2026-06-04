@@ -52,7 +52,21 @@ import {
 import { ClientCollectionChartCard } from '../components/ClientCollectionChartCard';
 import { COLLECTION_CLIENT_GROUPS } from '../data/collectionClientDemo';
 import { NewLogosBreakdownTable } from '../components/NewLogosBreakdownTable';
-import { ServiceFeeBreakdownCell } from '../components/ServiceFeeBreakdownCell';
+import {
+  REVENUE_GRAND_TOTAL_COL_WIDTH,
+  REVENUE_PERIOD_COL_MIN_WIDTH,
+  REVENUE_PROJECT_NAME_INDENT,
+  REVENUE_SALES_REP_COL_WIDTH,
+  revenueTableScrollWidth,
+} from '../constants/revenueTableLayout';
+import {
+  expandedProjectTableCellProps,
+  RevenueExpandedProjectGrid,
+} from '../components/RevenueExpandedProjectGrid';
+import {
+  buildRevenueDetailProjectRow,
+  type RevenueDetailProjectRow,
+} from '../utils/revenueTableDetailLines';
 import {
   isNewLogoClientInRange,
   isNewLogoClientZeroRevenue,
@@ -375,9 +389,6 @@ function personFirstName(name: string) {
   return parts[0] ?? name;
 }
 
-const REVENUE_BREAKDOWN_NAME_COL_WIDTH = 280;
-const REVENUE_BREAKDOWN_PERIOD_COL_WIDTH = 112;
-const REVENUE_BREAKDOWN_TOTAL_COL_WIDTH = 140;
 
 type RevenueBreakdownRow = {
   key: RepKey;
@@ -711,11 +722,10 @@ function TotalRevenueTrendTooltip({
 
 type RepTableRow = RevenueBreakdownRow & { rowType: 'rep' };
 type ClientTableRow = ClientBreakdownRow & { rowType: 'client'; parentKey: RepKey };
-type DisplayRow = RepTableRow | ClientTableRow;
+type DisplayRow = RepTableRow | ClientTableRow | RevenueDetailProjectRow;
 
-function clientIdForDisplayRow(record: DisplayRow): ClientId | undefined {
-  if (record.rowType !== 'client') return undefined;
-  return record.clientId ?? CLIENTS.find((c) => c.name === record.name)?.id;
+function isDetailProjectRow(record: DisplayRow): record is RevenueDetailProjectRow {
+  return record.rowType === 'detail-project';
 }
 
 function repRowExpandable(record: RepTableRow, selectedClientIds: ClientFilter, eorOnly: boolean) {
@@ -825,31 +835,60 @@ export default function SalesRevenueAnalyticsPage() {
       rows.push({ ...rep, rowType: 'rep' });
       if (!expandedRepKeys.includes(rep.key)) continue;
       for (const client of clientRowsForRep(rep.key, rep.values, selectedClientIds, eorOnly)) {
-        rows.push({ ...client, rowType: 'client', parentKey: rep.key });
+        const detailRow = buildRevenueDetailProjectRow({
+          rowKeyPrefix: client.key,
+          parentKey: rep.key,
+          entityName: client.name,
+          nameIndent: REVENUE_PROJECT_NAME_INDENT,
+          periodValues: client.values,
+          rowTotal: client.total,
+          clientId: client.clientId,
+          showZeroAmount: true,
+          revenueOnly: eorOnly,
+          eorProject: false,
+        });
+        if (detailRow) {
+          rows.push(detailRow);
+        } else {
+          rows.push({ ...client, rowType: 'client', parentKey: rep.key });
+        }
       }
     }
     return rows;
   }, [eorOnly, expandedRepKeys, filteredTableRows, selectedClientIds]);
 
   const revenueTableScrollX = useMemo(
-    () =>
-      REVENUE_BREAKDOWN_NAME_COL_WIDTH +
-      view.periods.length * REVENUE_BREAKDOWN_PERIOD_COL_WIDTH +
-      REVENUE_BREAKDOWN_TOTAL_COL_WIDTH,
+    () => revenueTableScrollWidth(view.periods.length),
     [view.periods.length],
   );
 
+  const revenueBreakdownColumnCount = view.periods.length + 2;
+
   const columns: TableColumnsType<DisplayRow> = useMemo(
-    () => [
+    () => {
+      const projectCellProps = (record: DisplayRow, columnKey: string) =>
+        expandedProjectTableCellProps(record, columnKey, 'name', revenueBreakdownColumnCount);
+
+      return [
       {
         title: 'Sales Representative',
         dataIndex: 'name',
         key: 'name',
-        width: REVENUE_BREAKDOWN_NAME_COL_WIDTH,
+        fixed: 'left',
+        width: REVENUE_SALES_REP_COL_WIDTH,
+        onCell: (record) => projectCellProps(record, 'name'),
         render: (name: string, record) => {
+          if (isDetailProjectRow(record)) {
+            return <RevenueExpandedProjectGrid record={record} periodCount={view.periods.length} />;
+          }
+
           if (record.rowType === 'client') {
             return (
-              <Text type="secondary" style={{ display: 'block', paddingLeft: 34, fontSize: 13 }}>
+              <Text
+                type="secondary"
+                className="analytics-revenue-table__client-indent"
+                style={{ display: 'block', fontSize: 13 }}
+              >
                 {name}
               </Text>
             );
@@ -888,17 +927,16 @@ export default function SalesRevenueAnalyticsPage() {
         title: p,
         key: p,
         align: 'right' as const,
-        width: REVENUE_BREAKDOWN_PERIOD_COL_WIDTH,
+        minWidth: REVENUE_PERIOD_COL_MIN_WIDTH,
+        onCell: (record: DisplayRow) => projectCellProps(record, p),
         render: (_: unknown, record: DisplayRow) => {
+          if (isDetailProjectRow(record)) return null;
           const amount = coerceAmount(record.values[idx]);
           if (record.rowType === 'client') {
             return (
-              <ServiceFeeBreakdownCell
-                serviceFeeTotal={amount}
-                clientId={clientIdForDisplayRow(record)}
-                muted
-                revenueOnly={eorOnly}
-              />
+              <Text strong={false} type="secondary">
+                {formatMoney(amount)}
+              </Text>
             );
           }
           return <Text>{formatMoney(amount)}</Text>;
@@ -908,23 +946,21 @@ export default function SalesRevenueAnalyticsPage() {
         title: 'Grand Total',
         key: 'total',
         align: 'right' as const,
-        width: REVENUE_BREAKDOWN_TOTAL_COL_WIDTH,
+        width: REVENUE_GRAND_TOTAL_COL_WIDTH,
+        onCell: (record) => projectCellProps(record, 'total'),
         render: (_: unknown, record: DisplayRow) => {
+          if (isDetailProjectRow(record)) return null;
           if (record.rowType === 'client') {
             return (
-              <ServiceFeeBreakdownCell
-                serviceFeeTotal={record.total}
-                clientId={clientIdForDisplayRow(record)}
-                muted
-                revenueOnly={eorOnly}
-              />
+              <Text type="secondary">{formatMoney(record.total)}</Text>
             );
           }
           return <Text strong>{formatMoney(record.total)}</Text>;
         },
       },
-    ],
-    [eorOnly, expandedRepKeys, selectedClientIds, view.periods],
+    ];
+    },
+    [eorOnly, expandedRepKeys, revenueBreakdownColumnCount, selectedClientIds, view.periods],
   );
 
   const multiChartMax = useMemo(
@@ -1505,10 +1541,12 @@ export default function SalesRevenueAnalyticsPage() {
             className="analytics-revenue-table"
             rowKey="key"
             columns={columns}
+            sticky
             scroll={{ x: revenueTableScrollX }}
             dataSource={displayTableRows}
             rowClassName={(record) => {
-              if (record.rowType === 'client') return 'analytics-revenue-client-row';
+              if (isDetailProjectRow(record)) return 'analytics-revenue-expanded-project-row';
+              if (record.rowType === 'client') return 'analytics-revenue-detail-row';
               return repRowExpandable(record, selectedClientIds, eorOnly)
                 ? 'analytics-revenue-rep-row analytics-revenue-rep-row--expandable'
                 : 'analytics-revenue-rep-row';
@@ -1541,9 +1579,9 @@ export default function SalesRevenueAnalyticsPage() {
             summary={
               isAllReps
                 ? () => (
-                    <Table.Summary>
-                      <Table.Summary.Row style={{ background: 'rgba(70, 155, 255, 0.08)' }}>
-                        <Table.Summary.Cell index={0} align="right">
+                    <Table.Summary fixed>
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell index={0} align="right" className="analytics-revenue-table__summary-first">
                           <Text strong>Revenue Total</Text>
                         </Table.Summary.Cell>
                         {view.periods.map((p, idx) => (

@@ -15,3 +15,14 @@ export function formatMoney(value: number | null | undefined): string {
 export function formatMoneyValue(value: number | null | undefined): string {
   return `$${coerceAmount(value).toLocaleString('en-US')}`;
 }
+
+/** Compact currency for breakdown sub-rows (e.g. $1.6k). */
+export function moneyShort(value: number | null | undefined): string {
+  const abs = Math.abs(coerceAmount(value));
+  if (abs >= 1000) {
+    const k = Math.round((abs / 1000) * 10) / 10;
+    const formatted = Number.isInteger(k) ? String(k) : k.toFixed(1);
+    return `$${formatted}k`;
+  }
+  return `$${abs.toLocaleString('en-US')}`;
+}

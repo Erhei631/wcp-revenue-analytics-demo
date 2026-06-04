@@ -80,6 +80,7 @@ export function RevenueAnalyticsSummaryPanel({
               <BreakdownMetric label="Equity" amount={breakdown.equity} />
             </div>
             <div className="revenue-analytics-summary__breakdown-inset-wrap">
+              <span className="revenue-analytics-summary__breakdown-caret" aria-hidden />
               <div className="revenue-analytics-summary__breakdown-inset" role="group" aria-label="Cash breakdown">
                 <BreakdownMetric label="Paid" amount={breakdown.paid} size="sm" />
                 <BreakdownMetric label="Unpaid" amount={breakdown.unpaid} size="sm" />
